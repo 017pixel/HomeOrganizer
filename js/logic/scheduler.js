@@ -4,7 +4,9 @@ function todayKey() {
 }
 function weekday(dateKey) {
   const d = dateKey ? new Date(dateKey + 'T12:00:00.000Z') : new Date();
-  return d.toLocaleDateString('de-DE', { weekday: 'long' }).toLowerCase();
+  const day = d.getUTCDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+  const mapping = ['sonntag', 'montag', 'dienstag', 'mittwoch', 'donnerstag', 'freitag', 'samstag'];
+  return mapping[day];
 }
 async function getAvailableMinutes(dateKey) {
   const s = await HomeDB.settings.get('availability');

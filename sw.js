@@ -1,4 +1,4 @@
-const CACHE_NAME = 'homeorganizer-v9';
+const CACHE_NAME = 'homeorganizer-v10';
 const PRECACHE = [
   './',
   './index.html',
@@ -11,8 +11,11 @@ const PRECACHE = [
   './assets/icons/pwa/icon-1024.png',
   './styles/design-system.css',
   './js/db/idb.js',
+  './js/logic/recurrence.js',
+  './js/logic/plannerCore.js',
   './js/logic/scheduler.js',
   './js/ui/cardStack.js',
+  './js/ui/listSwipe.js',
   './js/ui/app.js',
   './assets/icons/material/calendar_today.svg',
   './assets/icons/material/checklist.svg',

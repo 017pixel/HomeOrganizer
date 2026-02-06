@@ -5,16 +5,19 @@ function openDB() {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
-      if (!db.objectStoreNames.contains('tasks')) db.createObjectStore('tasks', { keyPath: 'id', autoIncrement: true });
       try {
+        if (!db.objectStoreNames.contains('tasks')) db.createObjectStore('tasks', { keyPath: 'id', autoIncrement: true });
         const tasksStore = req.transaction.objectStore('tasks');
         if (tasksStore && !tasksStore.indexNames.contains('nextDue')) tasksStore.createIndex('nextDue', 'nextDue', { unique: false });
-      } catch {}
-      if (!db.objectStoreNames.contains('dailyPlans')) db.createObjectStore('dailyPlans', { keyPath: 'date' });
-      if (!db.objectStoreNames.contains('streaks')) db.createObjectStore('streaks', { keyPath: 'id' });
-      if (!db.objectStoreNames.contains('settings')) db.createObjectStore('settings', { keyPath: 'key' });
-      if (!db.objectStoreNames.contains('learningPatterns')) db.createObjectStore('learningPatterns', { keyPath: 'id', autoIncrement: true });
-      if (!db.objectStoreNames.contains('taskSwaps')) db.createObjectStore('taskSwaps', { keyPath: 'id', autoIncrement: true });
+      } catch (e) { console.error('Migration error tasks:', e); }
+
+      try {
+        if (!db.objectStoreNames.contains('dailyPlans')) db.createObjectStore('dailyPlans', { keyPath: 'date' });
+        if (!db.objectStoreNames.contains('streaks')) db.createObjectStore('streaks', { keyPath: 'id' });
+        if (!db.objectStoreNames.contains('settings')) db.createObjectStore('settings', { keyPath: 'key' });
+        if (!db.objectStoreNames.contains('learningPatterns')) db.createObjectStore('learningPatterns', { keyPath: 'id', autoIncrement: true });
+        if (!db.objectStoreNames.contains('taskSwaps')) db.createObjectStore('taskSwaps', { keyPath: 'id', autoIncrement: true });
+      } catch (e) { console.error('Migration error stores:', e); }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);

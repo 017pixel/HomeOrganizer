@@ -70,7 +70,7 @@ function scheduleMidnightRefresh(){
 }
 async function ensureDefaults(){
   const hasAvail = await HomeDB.settings.get('availability');
-  if(!hasAvail) await HomeDB.settings.put({key:'availability',mon:60,dienstag:60,mittwoch:60,donnerstag:60,freitag:60,samstag:90,sonntag:90});
+  if(!hasAvail) await HomeDB.settings.put({key:'availability',montag:60,dienstag:60,mittwoch:60,donnerstag:60,freitag:60,samstag:90,sonntag:90});
   const themeEntry = await HomeDB.settings.get('theme');
   const theme = themeEntry && themeEntry.value ? themeEntry.value : 'dark';
   const normalizedTheme = theme === 'light' ? 'light' : 'dark';
@@ -216,12 +216,17 @@ function initTabs(){
     if (fabBtn) {
       fabBtn.hidden = tab !== 'tasks';
     }
-    if (tab==='plan') await renderPlan();
-    if (tab==='tasks') {
-      await renderTasks();
-      showUpdatePopupIfNeeded();
+    try {
+      if (tab==='plan') await renderPlan();
+      if (tab==='tasks') {
+        await renderTasks();
+        showUpdatePopupIfNeeded();
+      }
+      if (tab==='stats') await renderStats();
+    } catch (err) {
+      console.error(`Error rendering tab ${tab}:`, err);
+      showToast('Fehler beim Anzeigen: ' + err.message);
     }
-    if (tab==='stats') await renderStats();
   };
   tabs.forEach((b,idx)=>{
     b.setAttribute('role','tab');
@@ -301,6 +306,21 @@ function initActions(){
       }
     };
   }
+
+  const resetBtn = $('#danger-reset');
+  if (resetBtn) resetBtn.onclick = async () => {
+    if (confirm('Möchtest du wirklich alle Daten löschen? Dies kann nicht rückgängig gemacht werden.')) {
+      localStorage.clear();
+      const req = indexedDB.deleteDatabase('homeorganizer');
+      req.onsuccess = () => {
+        alert('Daten gelöscht. Die App wird neu geladen.');
+        location.reload();
+      };
+      req.onerror = () => {
+        alert('Fehler beim Löschen der Datenbank.');
+      };
+    }
+  };
 }
 
 function openHelpSheet(){
@@ -794,13 +814,23 @@ async function renderStats(){
   const card3=el('div','card');const t3=el('div','card-title');t3.textContent='Streak';const m3=el('div','card-meta');m3.textContent=String(streak.count||0)+' Tage';card3.append(t3,m3);c.append(card3);
 }
 async function start(){
-  await ensureDefaults();
-  await ensureDayRollover();
-  initTabs();
-  initActions();
-  await renderTasks();
-  await renderStats();
-  scheduleMidnightRefresh();
-  showTutorialIfNeeded();
+  try {
+    await ensureDefaults();
+    await ensureDayRollover();
+    initTabs();
+    initActions();
+    await renderTasks();
+    await renderStats();
+    scheduleMidnightRefresh();
+    showTutorialIfNeeded();
+  } catch (err) {
+    console.error('Initialization error:', err);
+    showToast('Fehler beim Laden: ' + (err.message || 'Unbekannter Fehler'));
+    // Fallback: try to show the plan at least
+    const container = document.getElementById('cards-container');
+    if (container) {
+      container.innerHTML = `<div class="card"><div class="card-title">Fehler</div><div class="card-meta">${err.message || 'Die App konnte nicht korrekt geladen werden.'}</div></div>`;
+    }
+  }
 }
 document.addEventListener('DOMContentLoaded',start);

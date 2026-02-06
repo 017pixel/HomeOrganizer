@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>HomeOrganizer</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#6b9080" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#a8dadc" media="(prefers-color-scheme: light)">
+<link rel="apple-touch-icon" href="assets/icons/pwa/apple-touch-icon.png" sizes="180x180">
+<link rel="icon" href="assets/icons/pwa/icon-32.png" type="image/png" sizes="32x32">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles/design-system.css">
+</head>
+<body>
+<div class="app">
+<nav class="navbar">
+<div class="navbar__logo">HomeOrganizer</div>
+<img class="navbar__appicon" src="assets/icons/pwa/icon-64.png" alt="HomeOrganizer" width="44" height="44" loading="lazy" decoding="async" fetchpriority="low">
+</nav>
+<main class="app-main">
+<div class="container">
+<section class="daily-plan">
+<h2 class="section-title">Heutiger Plan <span class="plan-progress" id="plan-progress">0/3</span></h2>
+<div class="card-stack" id="card-stack">
+<div class="swipe-indicator swipe-left" id="swipe-left"><span class="swipe-label">NEU</span><span class="swipe-count" id="swipe-left-count">3</span></div>
+<div class="swipe-indicator swipe-right" id="swipe-right"><span class="swipe-icon">✓</span><span class="swipe-label">ERLEDIGT</span></div>
+<div class="swipe-indicator swipe-up" id="swipe-up"><span class="swipe-icon">↑</span><span class="swipe-label">Nächste</span></div>
+<div class="cards-container" id="cards-container">
+<div class="card stack-current" aria-hidden="true"><div class="card__difficulty card__difficulty--medium">…</div><div class="card-title">Lade…</div><div class="card-meta">Plan wird geladen</div></div>
+<div class="card stack-next" aria-hidden="true"><div class="card__difficulty card__difficulty--medium">…</div><div class="card-title">Lade…</div><div class="card-meta">Plan wird geladen</div></div>
+<div class="card stack-prev" aria-hidden="true"><div class="card__difficulty card__difficulty--medium">…</div><div class="card-title">Lade…</div><div class="card-meta">Plan wird geladen</div></div>
+</div>
+<div class="haptic-zone" id="haptic-zone"></div>
+</div>
+<div class="gesture-help" id="gesture-help" hidden>
+<div class="gesture-help__content">
+<h3>Willkommen bei Karteikarten!</h3>
+<ul>
+<li><span class="gesture gesture--right">→</span> Streichen für Erledigt</li>
+<li><span class="gesture gesture--left">←</span> Streichen für Neue Aufgabe</li>
+<li><span class="gesture gesture--up">↑</span> Hoch zur nächsten Karte</li>
+</ul>
+<button class="btn btn-primary" id="gesture-help-dismiss">Verstanden!</button>
+</div>
+</div>
+</section>
+<section class="tasks">
+  <h2 class="section-title">Aufgaben</h2>
+  <div id="tasks-container" class="list"></div>
+</section>
+<div id="fab-container" class="fab-container">
+  <button id="add-task" class="fab" aria-label="Aufgabe hinzufügen" hidden><img src="assets/icons/material/add.svg" alt=""></button>
+</div>
+<section class="stats" hidden>
+<h2 class="section-title">Statistiken</h2>
+<div id="stats-container" class="cards"></div>
+</section>
+<section class="settings" hidden>
+<h2 class="section-title">Einstellungen</h2>
+<div class="toggle-wrapper">
+<span class="toggle-label">Dark Mode</span>
+<div class="toggle-control">
+<input type="checkbox" id="theme-toggle" class="toggle__input" aria-label="Theme umschalten">
+<label class="toggle" for="theme-toggle">
+<span class="toggle__slider" aria-hidden="true"></span>
+</label>
+</div>
+</div>
+<div class="settings-actions">
+<button type="button" id="open-help" class="btn btn-secondary">Wie geht das?</button>
+<button type="button" id="restart-tutorial" class="btn btn-secondary">Tutorial neu starten</button>
+<div class="settings-actions__row">
+<button type="button" id="export-data" class="btn btn-secondary">Export (JSON)</button>
+<button type="button" id="import-data" class="btn btn-secondary">Import (JSON)</button>
+<input type="file" id="import-file" accept="application/json" hidden>
+</div>
+</div>
+</section>
+</div>
+</main>
+<div id="modal-backdrop" class="modal-backdrop" aria-hidden="true">
+<div id="task-modal" class="modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="task-modal-title">
+<div class="modal__header">
+<div id="task-modal-title" class="modal__title">Neue Aufgabe</div>
+<button type="button" id="task-close" class="modal__close" aria-label="Schließen">×</button>
+</div>
+<form id="task-form">
+<div class="modal__body">
+<div class="input-group">
+<label class="input-label" for="task-title">Titel</label>
+<input id="task-title" class="input-field" type="text" placeholder="Titel" autocomplete="off">
+</div>
+<div class="input-group">
+<label class="input-label" for="task-duration">Dauer</label>
+<select id="task-duration" class="select">
+<option value="15">15 Minuten</option>
+<option value="30">30 Minuten</option>
+<option value="60">60 Minuten</option>
+<option value="120">120 Minuten</option>
+</select>
+</div>
+</div>
+<div class="modal__footer">
+<button type="button" id="task-cancel" class="btn btn-secondary"><span class="label">Abbrechen</span></button>
+<button type="submit" class="btn btn-primary"><span class="label">Speichern</span></button>
+</div>
+</form>
+</div>
+</div>
+<div id="help-backdrop" class="sheet-backdrop" aria-hidden="true">
+<div id="help-sheet" class="sheet" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="help-title">
+<div class="sheet__header">
+<div id="help-title" class="sheet__title">Wie geht das?</div>
+<button type="button" id="help-close" class="modal__close" aria-label="Schließen">×</button>
+</div>
+<div class="sheet__body">
+<div class="card">
+<div class="card-title">Karteikarten</div>
+<div class="card-meta">Swipe rechts: erledigt • Swipe links: neue Aufgabe (max 3/Tag) • Swipe hoch: nächste Karte</div>
+</div>
+<div class="card">
+<div class="card-title">Swaps</div>
+<div class="card-meta">Du hast pro Tag 3 Swaps. Der Counter steht links am Plan.</div>
+</div>
+<div class="card">
+<div class="card-title">Streak</div>
+<div class="card-meta">Wenn du an einem Tag alle 3 Aufgaben erledigst, steigt deine Streak um 1. Verpasst du einen Tag, wird sie zurückgesetzt.</div>
+</div>
+<div class="card">
+<div class="card-title">Daten</div>
+<div class="card-meta">Export speichert alles als JSON. Import ersetzt deine lokalen Daten durch die importierten.</div>
+</div>
+</div>
+</div>
+</div>
+<div id="tutorial-backdrop" class="tutorial-backdrop" aria-hidden="true">
+<div id="tutorial" class="tutorial" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="tutorial-title">
+<div class="tutorial__top">
+<div class="tutorial__brand">HomeOrganizer</div>
+<button type="button" id="tutorial-skip" class="btn btn-secondary tutorial__skip">Überspringen</button>
+</div>
+<div class="tutorial__viewport">
+<div class="tutorial__slides" id="tutorial-slides" style="transform:translateX(0%)">
+<div class="tutorial__slide" data-slide="0">
+<div class="tutorial__art tutorial__art--one">
+<div class="tutorial__shape tutorial__shape--burst"></div>
+<div class="tutorial__shape tutorial__shape--card"></div>
+</div>
+<div class="tutorial__title" id="tutorial-title">Dein Alltag. Drei Karten.</div>
+<div class="tutorial__text">Jeden Tag bekommst du 3 Aufgaben, passend zu deiner verfügbaren Zeit.</div>
+</div>
+<div class="tutorial__slide" data-slide="1">
+<div class="tutorial__art tutorial__art--two">
+<div class="tutorial__shape tutorial__shape--swipe"></div>
+<div class="tutorial__shape tutorial__shape--check"></div>
+</div>
+<div class="tutorial__title">Wischen statt klicken.</div>
+<div class="tutorial__text">Rechts = erledigt • Links = tauschen (3/Tag) • Hoch = nächste Karte.</div>
+</div>
+<div class="tutorial__slide" data-slide="2">
+<div class="tutorial__art tutorial__art--three">
+<div class="tutorial__shape tutorial__shape--streak"></div>
+<div class="tutorial__shape tutorial__shape--spark"></div>
+</div>
+<div class="tutorial__title">Baue deine Streak auf.</div>
+<div class="tutorial__text">Erledige alle 3 Aufgaben am Tag und erhöhe deine Streak – wie bei Duolingo.</div>
+</div>
+</div>
+</div>
+<div class="tutorial__footer">
+<div class="tutorial__dots" id="tutorial-dots" aria-hidden="true">
+<span class="tutorial__dot active"></span>
+<span class="tutorial__dot"></span>
+<span class="tutorial__dot"></span>
+</div>
+<div class="tutorial__actions">
+<button type="button" id="tutorial-back" class="btn btn-secondary">Zurück</button>
+<button type="button" id="tutorial-next" class="btn btn-primary">Weiter</button>
+</div>
+</div>
+</div>
+</div>
+<nav class="tabbar">
+<button class="tab active" data-tab="plan" aria-label="Plan"><span class="icon"><img src="assets/icons/material/calendar_today.svg" alt=""></span></button>
+<button class="tab" data-tab="tasks" aria-label="Aufgaben"><span class="icon"><img src="assets/icons/material/checklist.svg" alt=""></span></button>
+<button class="tab" data-tab="stats" aria-label="Statistiken"><span class="icon"><img src="assets/icons/material/bar_chart.svg" alt=""></span></button>
+<button class="tab" data-tab="settings" aria-label="Einstellungen"><span class="icon"><img src="assets/icons/material/settings.svg" alt=""></span></button>
+</nav>
+</div>
+<script src="js/db/idb.js"></script>
+<script src="js/logic/scheduler.js"></script>
+<script src="js/ui/cardStack.js"></script>
+<script src="js/ui/app.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('sw.js').then(function(reg) {
+      if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      reg.addEventListener('updatefound', function() {
+        const sw = reg.installing;
+        if (!sw) return;
+        sw.addEventListener('statechange', function() {
+          if (sw.state === 'installed' && reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        });
+      });
+    });
+  });
+}
+</script>
+</body>
+</html>

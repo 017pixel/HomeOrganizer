@@ -1,0 +1,15 @@
+{
+  "name": "cleanhome-pwa",
+  "private": true,
+  "scripts": {
+    "serve": "http-server . -p 4173 -c-1",
+    "test:visual": "playwright test",
+    "test:visual:update": "playwright test --update-snapshots",
+    "lh": "lhci autorun --config=./lighthouserc.json"
+  },
+  "devDependencies": {
+    "@lhci/cli": "^0.14.0",
+    "@playwright/test": "^1.50.0",
+    "http-server": "^14.1.1"
+  }
+}

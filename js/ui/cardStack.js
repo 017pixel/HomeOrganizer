@@ -106,7 +106,10 @@ class CardStackManager {
 
     const meta = document.createElement('div');
     meta.className = 'card-meta';
-    meta.textContent = `${t.duration} min${t.status === 'done' ? ' • erledigt' : ''}`;
+    const isFixed = !!t.fixed;
+    const fmt = window.HomeRecurrence && typeof window.HomeRecurrence.formatGermanDate === 'function' ? window.HomeRecurrence.formatGermanDate : null;
+    const due = isFixed && t.dueDate ? (fmt ? fmt(t.dueDate) : t.dueDate) : null;
+    meta.textContent = `${isFixed ? 'Fest' : 'Frei'}${due ? ' • fällig ' + due : ''} • ${t.duration} min${t.status === 'done' ? ' • erledigt' : ''}`;
 
     card.append(badge, title, meta);
     return card;

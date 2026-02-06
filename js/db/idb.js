@@ -1,11 +1,15 @@
 const DB_NAME = 'homeorganizer';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 function openDB() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains('tasks')) db.createObjectStore('tasks', { keyPath: 'id', autoIncrement: true });
+      try {
+        const tasksStore = req.transaction.objectStore('tasks');
+        if (tasksStore && !tasksStore.indexNames.contains('nextDue')) tasksStore.createIndex('nextDue', 'nextDue', { unique: false });
+      } catch {}
       if (!db.objectStoreNames.contains('dailyPlans')) db.createObjectStore('dailyPlans', { keyPath: 'date' });
       if (!db.objectStoreNames.contains('streaks')) db.createObjectStore('streaks', { keyPath: 'id' });
       if (!db.objectStoreNames.contains('settings')) db.createObjectStore('settings', { keyPath: 'key' });
@@ -34,6 +38,23 @@ function del(store, key) {
 function list(store) {
   return tx(store, 'readonly').then(s => new Promise((resolve, reject) => { const r = s.getAll(); r.onsuccess = () => resolve(r.result || []); r.onerror = () => reject(r.error); }));
 }
+function listByIndexRange(store, indexName, range) {
+  return tx(store, 'readonly').then(
+    s =>
+      new Promise((resolve, reject) => {
+        let idx;
+        try {
+          idx = s.index(indexName);
+        } catch (e) {
+          reject(e);
+          return;
+        }
+        const r = idx.getAll(range);
+        r.onsuccess = () => resolve(r.result || []);
+        r.onerror = () => reject(r.error);
+      })
+  );
+}
 function clearStore(store) {
   return tx(store, 'readwrite').then(s => new Promise((resolve, reject) => { const r = s.clear(); r.onsuccess = () => resolve(); r.onerror = () => reject(r.error); }));
 }
@@ -44,6 +65,7 @@ const db = {
     get(id) { return get('tasks', id); },
     del(id) { return del('tasks', id); },
     list() { return list('tasks'); },
+    listDueThrough(dateKey) { return listByIndexRange('tasks', 'nextDue', IDBKeyRange.upperBound(dateKey)); },
     clear() { return clearStore('tasks'); }
   },
   dailyPlans: {

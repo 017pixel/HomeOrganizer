@@ -2,12 +2,13 @@ function todayKey() {
   const d = new Date();
   return d.toISOString().slice(0,10);
 }
-function weekday() {
-  return new Date().toLocaleDateString('de-DE', { weekday: 'long' }).toLowerCase();
+function weekday(dateKey) {
+  const d = dateKey ? new Date(dateKey + 'T12:00:00.000Z') : new Date();
+  return d.toLocaleDateString('de-DE', { weekday: 'long' }).toLowerCase();
 }
-async function getAvailableMinutes() {
+async function getAvailableMinutes(dateKey) {
   const s = await HomeDB.settings.get('availability');
-  const w = weekday();
+  const w = weekday(dateKey);
   if (s && s[w]) return s[w];
   return 60;
 }
@@ -27,14 +28,15 @@ function toPlanTask(task) {
     title: task.title,
     duration: task.duration,
     difficulty: getDifficulty(task.duration),
-    status: 'pending'
+    status: 'pending',
+    fixed: false
   };
 }
 
 class DailyPlanner {
-  async generateBalancedPlan() {
+  async generateBalancedPlan(dateKey = todayKey()) {
     const tasks = await HomeDB.tasks.list();
-    const minutes = await getAvailableMinutes();
+    const minutes = await getAvailableMinutes(dateKey);
 
     if (!tasks.length) {
       const fallback = [
@@ -43,7 +45,7 @@ class DailyPlanner {
         { id: -3, title: 'Aufgabe hinzufügen', duration: 60 }
       ];
       const plan = {
-        date: todayKey(),
+        date: dateKey,
         tasks: fallback.map(toPlanTask),
         minutes,
         difficulty: 'balanced',
@@ -53,40 +55,28 @@ class DailyPlanner {
       return plan;
     }
 
-    const easyTasks = tasks.filter(t => t.duration <= 20);
-    const mediumTasks = tasks.filter(t => t.duration > 20 && t.duration < 45);
-    const hardTasks = tasks.filter(t => t.duration >= 45);
-
-    let target = 'balanced';
-    let picked = [];
-
-    if (minutes <= 45) {
-      target = 'easy';
-      picked = [pickRandom(easyTasks), pickRandom(easyTasks), pickRandom(easyTasks)];
-    } else if (minutes <= 60) {
-      target = 'mixed';
-      picked = [pickRandom(easyTasks), pickRandom(easyTasks), pickRandom(mediumTasks)];
-    } else {
-      target = 'balanced';
-      picked = [pickRandom(easyTasks), pickRandom(easyTasks), pickRandom(hardTasks)];
+    let normalized = tasks;
+    if (window.HomeRecurrence) {
+      normalized = tasks.map(t => window.HomeRecurrence.ensureTaskNextDue(t, dateKey));
+      for (let i = 0; i < tasks.length; i++) {
+        const before = tasks[i];
+        const after = normalized[i];
+        if ((before.nextDue || null) !== (after.nextDue || null) || JSON.stringify(before.repeat || null) !== JSON.stringify(after.repeat || null) || (before.repeatError || null) !== (after.repeatError || null)) {
+          await HomeDB.tasks.put(after);
+        }
+      }
     }
 
-    const selected = [];
-    for (const p of picked) {
-      if (p && !selected.find(x => x.id === p.id)) selected.push(p);
-    }
-    while (selected.length < 3) {
-      const r = pickRandom(tasks);
-      if (!r) break;
-      if (tasks.length < 3 || !selected.find(x => x.id === r.id)) selected.push(r);
-      if (selected.length >= tasks.length) break;
+    let result = null;
+    if (window.HomePlannerCore && typeof window.HomePlannerCore.buildPlanTasks === 'function') {
+      result = window.HomePlannerCore.buildPlanTasks({ dateKey, tasks: normalized, minutes, maxTasks: 3 });
     }
 
     const plan = {
-      date: todayKey(),
-      tasks: selected.slice(0, 3).map(toPlanTask),
+      date: dateKey,
+      tasks: result && Array.isArray(result.tasks) ? result.tasks.slice(0, 3) : normalized.slice(0, 3).map(toPlanTask),
       minutes,
-      difficulty: target,
+      difficulty: result && result.targetDifficulty ? result.targetDifficulty : 'balanced',
       swapsRemaining: 3
     };
 
@@ -97,7 +87,7 @@ class DailyPlanner {
   async getOrFixTodayPlan() {
     const key = todayKey();
     let plan = await HomeDB.dailyPlans.get(key);
-    if (!plan || !plan.tasks || plan.tasks.length < 3) plan = await this.generateBalancedPlan();
+    if (!plan || !plan.tasks || plan.tasks.length < 3) plan = await this.generateBalancedPlan(key);
 
     if (plan.date !== key) plan.date = key;
     if (typeof plan.swapsRemaining !== 'number') plan.swapsRemaining = 3;
@@ -105,7 +95,8 @@ class DailyPlanner {
     plan.tasks = (plan.tasks || []).map(t => ({
       ...t,
       difficulty: t.difficulty || getDifficulty(t.duration || 0),
-      status: t.status || 'pending'
+      status: t.status || 'pending',
+      fixed: !!t.fixed
     }));
     await HomeDB.dailyPlans.put(plan);
     return plan;
@@ -118,11 +109,13 @@ class DailyPlanner {
 
     const idx = (plan.tasks || []).findIndex(t => t.id === oldTaskId);
     if (idx === -1) throw new Error('Aufgabe nicht im Plan');
+    if (plan.tasks[idx] && plan.tasks[idx].fixed) throw new Error('Feste Aufgaben können nicht getauscht werden');
 
     const allTasks = await HomeDB.tasks.list();
     const existing = new Set(plan.tasks.map(t => t.id));
-    const candidates = allTasks.filter(t => !existing.has(t.id));
-    const next = pickRandom(candidates.length ? candidates : allTasks.filter(t => t.id !== oldTaskId));
+    const freeOnly = allTasks.filter(t => !t.repeat || !t.repeat.kind || t.repeat.kind === 'none');
+    const candidates = freeOnly.filter(t => !existing.has(t.id));
+    const next = pickRandom(candidates.length ? candidates : freeOnly.filter(t => t.id !== oldTaskId));
     if (!next) throw new Error('Keine Ersatzaufgabe verfügbar');
 
     const timestamp = new Date().toISOString();
@@ -133,7 +126,7 @@ class DailyPlanner {
       timestamp
     });
 
-    plan.tasks[idx] = { ...toPlanTask(next), swappedAt: timestamp };
+    plan.tasks[idx] = { ...toPlanTask(next), swappedAt: timestamp, fixed: false };
     plan.swapsRemaining = Math.max(0, (plan.swapsRemaining || 0) - 1);
     await HomeDB.dailyPlans.put(plan);
     return plan;
@@ -142,16 +135,34 @@ class DailyPlanner {
   async completeTask(planDate, taskId) {
     const plan = await HomeDB.dailyPlans.get(planDate);
     if (!plan) return null;
+    const target = (plan.tasks || []).find(t => t.id === taskId) || null;
     plan.tasks = (plan.tasks || []).map(t => (t.id === taskId ? { ...t, status: 'done' } : t));
     await HomeDB.dailyPlans.put(plan);
+    if (target && target.fixed && target.dueDate && window.HomeRecurrence) {
+      const src = await HomeDB.tasks.get(taskId);
+      if (src && src.repeat && src.repeat.kind && src.repeat.kind !== 'none') {
+        const repeat = src.repeat;
+        const nextDue = window.HomeRecurrence.nextDueAfter(target.dueDate, repeat);
+        await HomeDB.tasks.put({ ...src, lastCompletedDue: target.dueDate, nextDue });
+      }
+    }
     return plan;
   }
 
   async completePlan(planDate) {
     const plan = await HomeDB.dailyPlans.get(planDate);
     if (!plan) return null;
+    const fixedCompleted = (plan.tasks || []).filter(t => t.fixed && t.dueDate && t.status !== 'done');
     plan.tasks = (plan.tasks || []).map(t => ({ ...t, status: 'done' }));
     await HomeDB.dailyPlans.put(plan);
+    if (fixedCompleted.length && window.HomeRecurrence) {
+      for (const t of fixedCompleted) {
+        const src = await HomeDB.tasks.get(t.id);
+        if (!src || !src.repeat || !src.repeat.kind || src.repeat.kind === 'none') continue;
+        const nextDue = window.HomeRecurrence.nextDueAfter(t.dueDate, src.repeat);
+        await HomeDB.tasks.put({ ...src, lastCompletedDue: t.dueDate, nextDue });
+      }
+    }
     return plan;
   }
 

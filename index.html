@@ -18,7 +18,6 @@
 <div class="app">
 <nav class="navbar">
 <div class="navbar__logo">HomeOrganizer</div>
-<img class="navbar__appicon" src="assets/icons/pwa/icon-64.png" alt="HomeOrganizer" width="44" height="44" loading="lazy" decoding="async" fetchpriority="low">
 </nav>
 <main class="app-main">
 <div class="container">
@@ -95,12 +94,66 @@
 </div>
 <div class="input-group">
 <label class="input-label" for="task-duration">Dauer</label>
-<select id="task-duration" class="select">
+<select id="task-duration" class="select" required>
 <option value="15">15 Minuten</option>
 <option value="30">30 Minuten</option>
 <option value="60">60 Minuten</option>
 <option value="120">120 Minuten</option>
 </select>
+</div>
+<div class="input-group">
+<label class="input-label" for="task-repeat">Wiederholung</label>
+<select id="task-repeat" class="select" aria-describedby="task-repeat-help" required>
+<option value="none">Keine (frei)</option>
+<option value="multi_week">Mehrmals pro Woche</option>
+<option value="weekly">Einmal pro Woche</option>
+<option value="biweekly">Alle 2 Wochen</option>
+<option value="monthly">Einmal pro Monat</option>
+<option value="quarterly">Einmal pro Quartal</option>
+<option value="halfyear">Einmal pro Halbjahr</option>
+<option value="yearly">Einmal pro Jahr</option>
+<option value="custom">Custom-Intervall</option>
+</select>
+<div class="field-help" id="task-repeat-help">Feste Aufgaben werden im Tagesplan priorisiert und können nicht getauscht werden.</div>
+</div>
+<div class="input-group" id="repeat-start-group" hidden>
+<label class="input-label" for="task-start-date">Start</label>
+<input id="task-start-date" class="input-field" type="date" autocomplete="off" aria-describedby="task-start-help">
+<div class="field-help" id="task-start-help">Festgelegte Aufgaben werden im Tagesplan (max. 3/Tag) priorisiert.</div>
+</div>
+<div class="input-group" id="repeat-weekdays-group" hidden>
+<label class="input-label" id="repeat-weekdays-label">Wochentage</label>
+<div class="weekday-grid" role="group" aria-labelledby="repeat-weekdays-label">
+<button type="button" class="weekday-chip" data-dow="0" aria-pressed="false" title="Montag">Mo</button>
+<button type="button" class="weekday-chip" data-dow="1" aria-pressed="false" title="Dienstag">Di</button>
+<button type="button" class="weekday-chip" data-dow="2" aria-pressed="false" title="Mittwoch">Mi</button>
+<button type="button" class="weekday-chip" data-dow="3" aria-pressed="false" title="Donnerstag">Do</button>
+<button type="button" class="weekday-chip" data-dow="4" aria-pressed="false" title="Freitag">Fr</button>
+<button type="button" class="weekday-chip" data-dow="5" aria-pressed="false" title="Samstag">Sa</button>
+<button type="button" class="weekday-chip" data-dow="6" aria-pressed="false" title="Sonntag">So</button>
+</div>
+<div class="field-help" id="repeat-weekdays-help">Für „Einmal pro Woche“ genau einen Tag wählen, für „Mehrmals“ mehrere.</div>
+</div>
+<div class="input-group" id="repeat-monthday-group" hidden>
+<label class="input-label" for="task-monthday">Tag im Monat (1–28)</label>
+<input id="task-monthday" class="input-field" type="number" min="1" max="28" step="1" placeholder="z.B. 15" autocomplete="off" aria-describedby="repeat-monthday-help">
+<div class="field-help" id="repeat-monthday-help">1–28 verhindert ungültige Termine in kurzen Monaten.</div>
+</div>
+<div class="input-group" id="repeat-custom-group" hidden>
+<label class="input-label" for="task-custom-unit">Custom-Intervall</label>
+<div class="inline-row">
+<input id="task-custom-every" class="input-field" type="number" min="1" max="365" step="1" placeholder="z.B. 10" autocomplete="off" aria-label="Intervall">
+<select id="task-custom-unit" class="select" aria-label="Einheit">
+<option value="day">Tage</option>
+<option value="week">Wochen</option>
+<option value="month">Monate</option>
+</select>
+</div>
+<div class="field-help" id="repeat-custom-help">Bei Wochen bitte Wochentage wählen, bei Monaten den Tag im Monat setzen.</div>
+</div>
+<div class="input-group" id="repeat-preview-group" hidden>
+<label class="input-label" for="repeat-preview">Nächster Termin</label>
+<div id="repeat-preview" class="field-preview" aria-live="polite">—</div>
 </div>
 </div>
 <div class="modal__footer">
@@ -119,11 +172,15 @@
 <div class="sheet__body">
 <div class="card">
 <div class="card-title">Karteikarten</div>
-<div class="card-meta">Swipe rechts: erledigt • Swipe links: neue Aufgabe (max 3/Tag) • Swipe hoch: nächste Karte</div>
+<div class="card-meta">Swipe rechts: erledigt • Swipe links: neue Aufgabe (max 3/Tag, nur für freie Aufgaben) • Swipe hoch: nächste Karte</div>
 </div>
 <div class="card">
 <div class="card-title">Swaps</div>
-<div class="card-meta">Du hast pro Tag 3 Swaps. Der Counter steht links am Plan.</div>
+<div class="card-meta">Du hast pro Tag 3 Swaps. Der Counter steht links am Plan. Feste Aufgaben können nicht getauscht werden.</div>
+</div>
+<div class="card">
+<div class="card-title">Wiederholungen</div>
+<div class="card-meta">Feste Aufgaben haben einen nächsten Termin und werden im Tagesplan vor freien Aufgaben eingeplant. Pro Tag gibt es maximal 3 Aufgaben; Überhang wird automatisch auf den nächsten Tag verschoben.</div>
 </div>
 <div class="card">
 <div class="card-title">Streak</div>
@@ -183,6 +240,67 @@
 </div>
 </div>
 </div>
+<div id="update-backdrop" class="tutorial-backdrop" aria-hidden="true">
+<div id="update-modal" class="tutorial" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="update-title">
+<div class="tutorial__top">
+<div class="tutorial__brand">Update</div>
+<button type="button" id="update-close" class="modal__close" aria-label="Schließen" style="color:var(--text-primary); font-size:32px; border:none; background:none; cursor:pointer;">×</button>
+</div>
+<div class="tutorial__viewport">
+<div class="tutorial__slides" id="update-slides" style="transform:translateX(0%)">
+<!-- Seite 1: Swipe Mechanic -->
+<div class="tutorial__slide">
+<div class="tutorial__art">
+<div class="tutorial__shape tutorial__shape--swipe"></div>
+</div>
+<div class="tutorial__title" id="update-title">Neue Swipe-Gesten</div>
+<div class="tutorial__text">
+Verwalte deine Aufgaben in der Liste jetzt noch schneller:
+<div style="margin-top:var(--space-md); display:flex; gap:var(--space-md); flex-direction:column; text-align:left;">
+<div style="display:flex; align-items:center; gap:var(--space-sm);">
+<div style="width:40px; height:40px; background:var(--accent-secondary); border-radius:var(--radius-1); display:grid; place-items:center; color:white; flex-shrink:0;">
+<svg viewBox="0 0 24 24" style="width:24px; height:24px; fill:currentColor;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+</div>
+<span>Nach <strong>Rechts</strong> swipen zum <strong>Bearbeiten</strong></span>
+</div>
+<div style="display:flex; align-items:center; gap:var(--space-sm);">
+<div style="width:40px; height:40px; background:var(--error); border-radius:var(--radius-1); display:grid; place-items:center; color:white; flex-shrink:0;">
+<svg viewBox="0 0 24 24" style="width:24px; height:24px; fill:currentColor;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+</div>
+<span>Nach <strong>Links</strong> swipen zum <strong>Löschen</strong></span>
+</div>
+</div>
+</div>
+</div>
+<!-- Seite 2: Recurrence -->
+<div class="tutorial__slide">
+<div class="tutorial__art">
+<div class="tutorial__shape tutorial__shape--check"></div>
+</div>
+<div class="tutorial__title">Wiederholungen</div>
+<div class="tutorial__text">
+Erstelle feste Aufgaben mit flexiblen Intervallen (täglich, wöchentlich, monatlich).
+<ul style="text-align:left; margin-top:var(--space-md); padding-left:var(--space-lg);">
+<li>Feste Aufgaben werden im Plan <strong>priorisiert</strong>.</li>
+<li>Maximal <strong>3 Aufgaben</strong> pro Tag.</li>
+<li>Überhang wird automatisch auf den nächsten Tag verschoben.</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="tutorial__footer">
+<div class="tutorial__dots" id="update-dots">
+<div class="tutorial__dot active"></div>
+<div class="tutorial__dot"></div>
+</div>
+<div class="tutorial__actions">
+<button type="button" id="update-back" class="btn btn-secondary" disabled>Zurück</button>
+<button type="button" id="update-next" class="btn btn-primary">Weiter</button>
+</div>
+</div>
+</div>
+</div>
 <nav class="tabbar">
 <button class="tab active" data-tab="plan" aria-label="Plan"><span class="icon"><img src="assets/icons/material/calendar_today.svg" alt=""></span></button>
 <button class="tab" data-tab="tasks" aria-label="Aufgaben"><span class="icon"><img src="assets/icons/material/checklist.svg" alt=""></span></button>
@@ -191,8 +309,11 @@
 </nav>
 </div>
 <script src="js/db/idb.js"></script>
+<script src="js/logic/recurrence.js"></script>
+<script src="js/logic/plannerCore.js"></script>
 <script src="js/logic/scheduler.js"></script>
 <script src="js/ui/cardStack.js"></script>
+<script src="js/ui/listSwipe.js"></script>
 <script src="js/ui/app.js"></script>
 <script>
 if ('serviceWorker' in navigator) {

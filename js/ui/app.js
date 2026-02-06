@@ -87,25 +87,55 @@ async function ensureDefaults(){
   }
 }
 function renderTaskItem(t){
+  const wrapper = el('div', 'list-item-wrapper');
+  wrapper.dataset.taskId = String(t.id);
+
+  const editAction = el('div', 'list-item-action list-item-action--edit');
+  editAction.innerHTML = '<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg><span>Bearbeiten</span>';
+
+  const deleteAction = el('div', 'list-item-action list-item-action--delete');
+  deleteAction.innerHTML = '<span>Löschen</span><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
+
   const li=el('div','list-item');
   const title=el('div','list-title');title.textContent=t.title;
-  const meta=el('div','card-meta');meta.textContent=t.duration+' min';
+  const meta=el('div','card-meta');
+  const isFixed = t && t.repeat && t.repeat.kind && t.repeat.kind !== 'none';
+  const parts = [];
+  if (isFixed) {
+    const fmt = window.HomeRecurrence && typeof window.HomeRecurrence.formatGermanDateTime === 'function' ? window.HomeRecurrence.formatGermanDateTime : null;
+    const due = t.nextDue ? (fmt ? fmt(t.nextDue, t.repeat && t.repeat.time ? t.repeat.time : null) : t.nextDue) : '—';
+    parts.push(`nächster Termin am ${due}`);
+  }
+  parts.push(`${t.duration} min`);
+  if (t && t.repeatError) parts.push(String(t.repeatError));
+  meta.textContent = parts.join(' • ');
   const left=el('div');left.append(title,meta);
-  const actions=el('div','list-actions');
-  const delBtn=el('button','icon-btn btn-danger');
-  delBtn.setAttribute('aria-label','Aufgabe löschen');
-  delBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 7h12v14H6V7zm3-3h6v2H9V4z"/></svg>';
-  delBtn.onclick=async()=>{await HomeDB.tasks.del(t.id);await renderTasks()};
-  actions.append(delBtn);
-  li.append(left,actions);
-  return li;
+  li.append(left);
+
+  wrapper.append(editAction, deleteAction, li);
+  return wrapper;
 }
+let listSwipeManager = null;
 async function renderTasks(){
   const c=$('#tasks-container');
   if(!c) return;
   c.innerHTML='';
   const tasks=await HomeDB.tasks.list();
   tasks.forEach(t=>c.append(renderTaskItem(t)));
+
+  if (!listSwipeManager) {
+    listSwipeManager = new ListSwipeManager('tasks-container', {
+      threshold: 60,
+      onEdit: async (id) => {
+        const task = await HomeDB.tasks.get(parseInt(id, 10));
+        if (task) openTaskModal(task);
+      },
+      onDelete: async (id) => {
+        await HomeDB.tasks.del(parseInt(id, 10));
+        await renderTasks();
+      }
+    });
+  }
 }
 async function getOrFixTodayPlan(){
   if (window.HomeScheduler && typeof HomeScheduler.getOrFixTodayPlan === 'function') return HomeScheduler.getOrFixTodayPlan();
@@ -187,7 +217,10 @@ function initTabs(){
       fabBtn.hidden = tab !== 'tasks';
     }
     if (tab==='plan') await renderPlan();
-    if (tab==='tasks') await renderTasks();
+    if (tab==='tasks') {
+      await renderTasks();
+      showUpdatePopupIfNeeded();
+    }
     if (tab==='stats') await renderStats();
   };
   tabs.forEach((b,idx)=>{
@@ -359,6 +392,62 @@ function showTutorialIfNeeded(){
   if(!seen) openTutorial();
 }
 
+let updateIndex = 0;
+function setUpdateSlide(nextIndex){
+  const slides = document.getElementById('update-slides');
+  const dots = document.getElementById('update-dots');
+  const back = document.getElementById('update-back');
+  const next = document.getElementById('update-next');
+  if(!slides || !dots || !back || !next) return;
+  updateIndex = Math.max(0, Math.min(1, nextIndex));
+  slides.style.transform = `translateX(${-updateIndex * 100}%)`;
+  Array.from(dots.querySelectorAll('.tutorial__dot')).forEach((d, i) => d.classList.toggle('active', i === updateIndex));
+  back.disabled = updateIndex === 0;
+  next.textContent = updateIndex === 1 ? 'Fertig' : 'Weiter';
+}
+
+function openUpdateModal(){
+  const b=$('#update-backdrop');
+  const m=$('#update-modal');
+  if(!b||!m) return;
+  const previouslyFocused=document.activeElement;
+  b.classList.add('open');
+  b.setAttribute('aria-hidden','false');
+  m.classList.add('open');
+  m.setAttribute('aria-hidden','false');
+  setUpdateSlide(0);
+  const close=()=>{
+    m.classList.remove('open');
+    m.setAttribute('aria-hidden','true');
+    b.classList.remove('open');
+    b.setAttribute('aria-hidden','true');
+    localStorage.setItem('swipeUpdateSeen', '1');
+    document.removeEventListener('keydown', onKeyDown);
+    if(previouslyFocused && typeof previouslyFocused.focus === 'function') previouslyFocused.focus();
+  };
+  const onKeyDown=(e)=>{
+    if(e.key==='Escape'){e.preventDefault();close();return;}
+  };
+  document.addEventListener('keydown', onKeyDown);
+  b.onclick=(e)=>{if(e.target===b) close();};
+  const closeBtn=$('#update-close');
+  if(closeBtn) closeBtn.onclick=close;
+  const backBtn=$('#update-back');
+  const nextBtn=$('#update-next');
+  if(backBtn) backBtn.onclick=()=>setUpdateSlide(updateIndex-1);
+  if(nextBtn) nextBtn.onclick=()=>{
+    if(updateIndex>=1) close();
+    else setUpdateSlide(updateIndex+1);
+  };
+  const first=m.querySelector('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])');
+  if(first) first.focus();
+}
+
+function showUpdatePopupIfNeeded(){
+  const seen = localStorage.getItem('swipeUpdateSeen') === '1';
+  if(!seen) openUpdateModal();
+}
+
 function downloadJSON(filename, obj){
   const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
@@ -414,10 +503,14 @@ async function importData(file){
   const swaps = Array.isArray(data.taskSwaps) ? data.taskSwaps : [];
   for (const sw of swaps) await HomeDB.taskSwaps.add(sw);
 }
-function openTaskModal(){
+function openTaskModal(taskToEdit = null){
   const m=$('#task-modal');
   const b=$('#modal-backdrop');
   if(!m||!b) return;
+
+  const titleEl = $('#task-modal-title');
+  if (titleEl) titleEl.textContent = taskToEdit ? 'Aufgabe bearbeiten' : 'Neue Aufgabe';
+
   const previouslyFocused=document.activeElement;
   b.classList.add('open');
   b.setAttribute('aria-hidden','false');
@@ -451,16 +544,239 @@ function openTaskModal(){
   if(closeBtn) closeBtn.onclick=close;
   b.onclick=(e)=>{if(e.target===b) close();};
   const titleInput=$('#task-title');
-  if(titleInput){
-    titleInput.value='';
+  const durationSelect = $('#task-duration');
+  const repeatSelect = $('#task-repeat');
+  const startGroup = $('#repeat-start-group');
+  const startDateInput = $('#task-start-date');
+  const weekdaysGroup = $('#repeat-weekdays-group');
+  const weekdayButtons = Array.from(m.querySelectorAll('.weekday-chip'));
+  const monthdayGroup = $('#repeat-monthday-group');
+  const monthdayInput = $('#task-monthday');
+  const customGroup = $('#repeat-custom-group');
+  const customEveryInput = $('#task-custom-every');
+  const customUnitSelect = $('#task-custom-unit');
+  const previewGroup = $('#repeat-preview-group');
+  const previewEl = $('#repeat-preview');
+
+  const today = todayKey();
+
+  // Reset / Set Initial Values
+  if (titleInput) {
+    titleInput.value = taskToEdit ? taskToEdit.title : '';
     titleInput.focus();
   }
+  if (durationSelect) durationSelect.value = taskToEdit ? String(taskToEdit.duration) : '30';
+  if (repeatSelect) {
+    if (!taskToEdit || !taskToEdit.repeat || taskToEdit.repeat.kind === 'none') {
+      repeatSelect.value = 'none';
+    } else {
+      const r = taskToEdit.repeat;
+      if (r.kind === 'weekly') {
+        if (r.intervalWeeks === 1) {
+          repeatSelect.value = r.daysOfWeek && r.daysOfWeek.length > 1 ? 'multi_week' : 'weekly';
+        } else if (r.intervalWeeks === 2) {
+          repeatSelect.value = 'biweekly';
+        } else {
+          repeatSelect.value = 'custom';
+        }
+      } else if (r.kind === 'monthly' && r.intervalMonths === 1) {
+        repeatSelect.value = 'monthly';
+      } else if (r.kind === 'quarterly') {
+        repeatSelect.value = 'quarterly';
+      } else if (r.kind === 'halfyear') {
+        repeatSelect.value = 'halfyear';
+      } else if (r.kind === 'yearly') {
+        repeatSelect.value = 'yearly';
+      } else {
+        repeatSelect.value = 'custom';
+      }
+    }
+  }
+
+  if (startDateInput) startDateInput.value = taskToEdit && taskToEdit.repeat && taskToEdit.repeat.startDate ? taskToEdit.repeat.startDate : today;
+  if (monthdayInput) monthdayInput.value = taskToEdit && taskToEdit.repeat && taskToEdit.repeat.dayOfMonth ? taskToEdit.repeat.dayOfMonth : '';
+  if (customEveryInput) {
+    if (taskToEdit && taskToEdit.repeat && taskToEdit.repeat.kind === 'custom') {
+      customEveryInput.value = taskToEdit.repeat.every || '';
+    } else if (taskToEdit && taskToEdit.repeat && taskToEdit.repeat.kind === 'weekly') {
+      customEveryInput.value = taskToEdit.repeat.intervalWeeks || '';
+    } else if (taskToEdit && taskToEdit.repeat && taskToEdit.repeat.kind === 'monthly') {
+      customEveryInput.value = taskToEdit.repeat.intervalMonths || '';
+    } else {
+      customEveryInput.value = '';
+    }
+  }
+  if (customUnitSelect) {
+    if (taskToEdit && taskToEdit.repeat && taskToEdit.repeat.kind === 'custom') {
+      customUnitSelect.value = taskToEdit.repeat.unit || 'day';
+    } else if (taskToEdit && taskToEdit.repeat && taskToEdit.repeat.kind === 'weekly') {
+      customUnitSelect.value = 'week';
+    } else if (taskToEdit && taskToEdit.repeat && taskToEdit.repeat.kind === 'monthly') {
+      customUnitSelect.value = 'month';
+    } else {
+      customUnitSelect.value = 'day';
+    }
+  }
+
+  weekdayButtons.forEach(btn => {
+    const dow = parseInt(btn.dataset.dow, 10);
+    const isSelected = taskToEdit && taskToEdit.repeat && taskToEdit.repeat.daysOfWeek && taskToEdit.repeat.daysOfWeek.includes(dow);
+    btn.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+  });
+
+  const clearError = (input) => {
+    if (!input) return;
+    input.classList.remove('input-field--error');
+    input.removeAttribute('aria-invalid');
+    const group = input.closest('.input-group');
+    const msg = group ? group.querySelector('.input-error-message[data-for="' + input.id + '"]') : null;
+    if (msg) msg.remove();
+  };
+  const setError = (input, message) => {
+    if (!input) return;
+    input.classList.add('input-field--error');
+    input.setAttribute('aria-invalid', 'true');
+    const group = input.closest('.input-group');
+    if (!group) return;
+    let msg = group.querySelector('.input-error-message[data-for="' + input.id + '"]');
+    if (!msg) {
+      msg = document.createElement('span');
+      msg.className = 'input-error-message';
+      msg.dataset.for = input.id;
+      group.appendChild(msg);
+    }
+    msg.textContent = message;
+  };
+
+  const getSelectedDays = () => weekdayButtons.filter(b => b.getAttribute('aria-pressed') === 'true').map(b => parseInt(b.dataset.dow, 10)).filter(Number.isFinite).sort((a, c) => a - c);
+  const ensureDefaultWeekday = () => {
+    if (!weekdayButtons.length) return;
+    const anySelected = weekdayButtons.some(b => b.getAttribute('aria-pressed') === 'true');
+    if (anySelected) return;
+    const dow = window.HomeRecurrence && typeof window.HomeRecurrence.weekdayIndexMonday0 === 'function' ? window.HomeRecurrence.weekdayIndexMonday0(today) : 0;
+    const btn = weekdayButtons.find(b => parseInt(b.dataset.dow, 10) === dow);
+    if (btn) btn.setAttribute('aria-pressed', 'true');
+  };
+
+  const buildRepeatInput = () => {
+    if (!repeatSelect) return null;
+    const mode = repeatSelect.value;
+    if (mode === 'none') return { kind: 'none' };
+    const startDate = startDateInput && startDateInput.value ? startDateInput.value : today;
+    const time = null;
+    if (mode === 'multi_week') return { kind: 'weekly', startDate, time, daysOfWeek: getSelectedDays(), intervalWeeks: 1 };
+    if (mode === 'weekly') return { kind: 'weekly', startDate, time, daysOfWeek: getSelectedDays(), intervalWeeks: 1 };
+    if (mode === 'biweekly') return { kind: 'weekly', startDate, time, daysOfWeek: getSelectedDays(), intervalWeeks: 2 };
+    if (mode === 'monthly') return { kind: 'monthly', startDate, time, dayOfMonth: monthdayInput && monthdayInput.value ? parseInt(monthdayInput.value, 10) : null, intervalMonths: 1 };
+    if (mode === 'quarterly') return { kind: 'quarterly', startDate, time };
+    if (mode === 'halfyear') return { kind: 'halfyear', startDate, time };
+    if (mode === 'yearly') return { kind: 'yearly', startDate, time };
+    if (mode === 'custom') {
+      const unit = customUnitSelect ? customUnitSelect.value : 'day';
+      const every = customEveryInput && customEveryInput.value ? parseInt(customEveryInput.value, 10) : null;
+      const base = { kind: 'custom', startDate, time, unit, every };
+      if (unit === 'week') return { ...base, daysOfWeek: getSelectedDays() };
+      if (unit === 'month') return { ...base, dayOfMonth: monthdayInput && monthdayInput.value ? parseInt(monthdayInput.value, 10) : null };
+      return base;
+    }
+    return { kind: 'none' };
+  };
+
+  const updatePreview = () => {
+    if (!previewEl || !previewGroup || !repeatSelect) return;
+    const mode = repeatSelect.value;
+    previewGroup.hidden = mode === 'none';
+    if (mode === 'none') {
+      previewEl.textContent = '—';
+      return;
+    }
+    if (!window.HomeRecurrence) {
+      previewEl.textContent = '—';
+      return;
+    }
+    try {
+      const normalized = window.HomeRecurrence.normalizeRepeatConfig(buildRepeatInput());
+      const next = window.HomeRecurrence.nextDueOnOrAfter(today, normalized);
+      const fmt = window.HomeRecurrence.formatGermanDateTime;
+      const dueStr = next ? (fmt ? fmt(next, normalized.time) : next) : '—';
+    const duration = parseInt($('#task-duration').value, 10) || 0;
+    previewEl.textContent = `nächster Termin am ${dueStr} • ${duration} min`;
+  } catch (e) {
+      previewEl.textContent = e && e.message ? e.message : 'Ungültiges Intervall';
+    }
+  };
+
+  const updateRepeatUI = () => {
+    if (!repeatSelect) return;
+    const mode = repeatSelect.value;
+    if (startGroup) startGroup.hidden = mode === 'none';
+    if (weekdaysGroup) weekdaysGroup.hidden = !(mode === 'multi_week' || mode === 'weekly' || mode === 'biweekly' || (mode === 'custom' && customUnitSelect && customUnitSelect.value === 'week'));
+    if (monthdayGroup) monthdayGroup.hidden = !(mode === 'monthly' || (mode === 'custom' && customUnitSelect && customUnitSelect.value === 'month'));
+    if (customGroup) customGroup.hidden = mode !== 'custom';
+    if (mode === 'weekly' || mode === 'biweekly') ensureDefaultWeekday();
+    updatePreview();
+  };
+
+  weekdayButtons.forEach(btn => {
+    btn.onclick = () => {
+      const isSingleMode = repeatSelect && (repeatSelect.value === 'weekly' || repeatSelect.value === 'biweekly');
+      const pressed = btn.getAttribute('aria-pressed') === 'true';
+      if (isSingleMode) {
+        weekdayButtons.forEach(b => b.setAttribute('aria-pressed', 'false'));
+        btn.setAttribute('aria-pressed', 'true');
+      } else {
+        btn.setAttribute('aria-pressed', pressed ? 'false' : 'true');
+      }
+      updatePreview();
+    };
+  });
+  if (repeatSelect) repeatSelect.onchange = () => updateRepeatUI();
+  if (durationSelect) durationSelect.onchange = () => updatePreview();
+  if (customUnitSelect) customUnitSelect.onchange = () => updateRepeatUI();
+  if (startDateInput) startDateInput.onchange = () => updatePreview();
+  if (monthdayInput) monthdayInput.oninput = () => updatePreview();
+  if (customEveryInput) customEveryInput.oninput = () => updatePreview();
+  updateRepeatUI();
+
   $('#task-form').onsubmit=async(e)=>{
     e.preventDefault();
+    clearError(titleInput);
+    clearError(durationSelect);
+    if (repeatSelect) clearError(repeatSelect);
+    clearError(startDateInput);
+    clearError(monthdayInput);
+    clearError(customEveryInput);
+    clearError(customUnitSelect);
+
     const title=$('#task-title').value.trim();
     const duration=parseInt($('#task-duration').value,10);
-    if(!title||!duration) return;
-    await HomeDB.tasks.add({title,duration});
+    if(!title){setError(titleInput,'Titel ist erforderlich');return;}
+    if(!duration){setError(durationSelect,'Dauer ist erforderlich');return;}
+
+    const repeatInput = buildRepeatInput();
+    let task = { title, duration };
+    if (repeatInput && repeatInput.kind && repeatInput.kind !== 'none') {
+      if (!startDateInput || !startDateInput.value) { setError(startDateInput,'Startdatum ist erforderlich'); return; }
+      try {
+        const normalized = window.HomeRecurrence ? window.HomeRecurrence.normalizeRepeatConfig(repeatInput) : repeatInput;
+        if ((repeatSelect.value === 'weekly' || repeatSelect.value === 'biweekly') && normalized.kind === 'weekly' && normalized.daysOfWeek.length !== 1) {
+          showToast('Bitte genau einen Wochentag auswählen');
+          return;
+        }
+        const nextDue = window.HomeRecurrence ? window.HomeRecurrence.nextDueOnOrAfter(today, normalized) : null;
+        task = { ...task, repeat: normalized, nextDue, lastCompletedDue: taskToEdit ? taskToEdit.lastCompletedDue : null };
+      } catch (err) {
+        showToast(err && err.message ? err.message : 'Ungültiges Intervall');
+        return;
+      }
+    }
+
+    if (taskToEdit) {
+      task.id = taskToEdit.id;
+      await HomeDB.tasks.put(task);
+    } else {
+      await HomeDB.tasks.add(task);
+    }
     await renderTasks();
     close();
   };

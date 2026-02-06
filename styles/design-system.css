@@ -144,7 +144,6 @@ h1,h2,h3{
   object-fit:contain;
   background:transparent;
 }
-.navbar__appicon:active{transform:translate(3px,3px)}
 
 .navbar__actions{display:flex;gap:var(--space-sm);align-items:center}
 

@@ -5,8 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>HomeOrganizer</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#6b9080" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="#a8dadc" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f9f9f9" media="(prefers-color-scheme: light)">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="assets/icons/pwa/apple-touch-icon.png" sizes="180x180">
 <link rel="icon" href="assets/icons/pwa/icon-32.png" type="image/png" sizes="32x32">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -85,7 +86,6 @@
 <div id="task-modal" class="modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="task-modal-title">
 <div class="modal__header">
 <div id="task-modal-title" class="modal__title">Neue Aufgabe</div>
-<button type="button" id="task-close" class="modal__close" aria-label="Schließen">×</button>
 </div>
 <form id="task-form">
 <div class="modal__body">
@@ -171,6 +171,10 @@
 <button type="button" id="help-close" class="modal__close" aria-label="Schließen">×</button>
 </div>
 <div class="sheet__body">
+<div class="card">
+<div class="card-title">Aufgabenliste</div>
+<div class="card-meta">Wischen nach rechts: bearbeiten • Wischen nach links: löschen</div>
+</div>
 <div class="card">
 <div class="card-title">Karteikarten</div>
 <div class="card-meta">Swipe rechts: erledigt • Swipe links: neue Aufgabe (max 3/Tag, nur für freie Aufgaben) • Swipe hoch: nächste Karte</div>

@@ -12,6 +12,16 @@ function showToast(message){
   document.body.appendChild(toast);
   setTimeout(()=>{toast.classList.add('toast--out');setTimeout(()=>toast.remove(),260)},2600);
 }
+function updateThemeColorMeta(theme) {
+  const color = theme === 'light' ? '#f9f9f9' : '#1a1a1a';
+  let meta = document.querySelector('meta[name="theme-color"]:not([media])');
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.name = 'theme-color';
+    document.head.appendChild(meta);
+  }
+  meta.content = color;
+}
 function yesterdayKey(dateKey){
   const d=new Date(dateKey+'T12:00:00.000Z');
   d.setUTCDate(d.getUTCDate()-1);
@@ -76,6 +86,7 @@ async function ensureDefaults(){
   const normalizedTheme = theme === 'light' ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', normalizedTheme);
   document.body.setAttribute('data-theme', normalizedTheme);
+  updateThemeColorMeta(normalizedTheme);
   const tasks = await HomeDB.tasks.list();
   if(!tasks.length){
     await HomeDB.tasks.add({title:'Küche aufräumen',duration:30});
@@ -273,6 +284,7 @@ function initActions(){
       const next=toggle.checked?'dark':'light';
       document.documentElement.setAttribute('data-theme', next);
       document.body.setAttribute('data-theme', next);
+      updateThemeColorMeta(next);
       await HomeDB.settings.put({key:'theme',value:next});
       renderStats();
     };
@@ -549,7 +561,6 @@ function openTaskModal(taskToEdit = null){
     return Array.from(m.querySelectorAll(selectors)).filter(el=>!el.hasAttribute('disabled') && !el.getAttribute('aria-hidden'));
   };
   const onKeyDown=(e)=>{
-    if(e.key==='Escape'){e.preventDefault();close();return;}
     if(e.key!=='Tab') return;
     const focusable=getFocusable();
     if(!focusable.length) return;
@@ -560,9 +571,6 @@ function openTaskModal(taskToEdit = null){
   };
   document.addEventListener('keydown', onKeyDown);
   $('#task-cancel').onclick=close;
-  const closeBtn=$('#task-close');
-  if(closeBtn) closeBtn.onclick=close;
-  b.onclick=(e)=>{if(e.target===b) close();};
   const titleInput=$('#task-title');
   const durationSelect = $('#task-duration');
   const repeatSelect = $('#task-repeat');

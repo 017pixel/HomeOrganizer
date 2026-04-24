@@ -85,6 +85,13 @@ test('Task-Modal', async ({ page }) => {
   await expect(page).toHaveScreenshot('task-modal.png', { fullPage: true });
 });
 
+test('Wochenuebersicht (Dark)', async ({ page }) => {
+  await page.goto('/');
+  await page.click('.tab[data-tab="week"]');
+  await blurActiveElement(page);
+  await expect(page).toHaveScreenshot('week-dark.png', { fullPage: true });
+});
+
 test('Light Mode', async ({ page }) => {
   await page.goto('/');
   await page.click('.tab[data-tab="settings"]');

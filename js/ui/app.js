@@ -189,6 +189,7 @@ function initTabs(){
   const sections={
     plan: document.querySelector('.daily-plan'),
     tasks: document.querySelector('.tasks'),
+    week: document.querySelector('.week-overview'),
     stats: document.querySelector('.stats'),
     settings: document.querySelector('.settings'),
   };
@@ -233,6 +234,7 @@ function initTabs(){
         await renderTasks();
         showUpdatePopupIfNeeded();
       }
+      if (tab==='week') await renderWeekOverview();
       if (tab==='stats') await renderStats();
     } catch (err) {
       console.error(`Error rendering tab ${tab}:`, err);
@@ -821,6 +823,77 @@ async function renderStats(){
   const streak=await getStreak();
   const card3=el('div','card');const t3=el('div','card-title');t3.textContent='Streak';const m3=el('div','card-meta');m3.textContent=String(streak.count||0)+' Tage';card3.append(t3,m3);c.append(card3);
 }
+async function renderWeekOverview(){
+  const container=document.getElementById('week-grid');
+  if(!container)return;
+  container.innerHTML='';
+  const today=todayKey();
+  const weekStart=window.HomeRecurrence?window.HomeRecurrence.startOfWeekMondayKey(today):today;
+  const weeksToShow=2;
+  const dayNames=['Mo','Di','Mi','Do','Fr','Sa','So'];
+  let allTasks=[];
+  let allPlans=[];
+  try{
+    allTasks=await HomeDB.tasks.list();
+    allPlans=await HomeDB.dailyPlans.list();
+  }catch(e){console.error('Error loading week data:',e);}
+  const plansByDate=new Map();
+  for(const plan of allPlans){if(plan&&plan.date)plansByDate.set(plan.date,plan);}
+  for(let w=0;w<weeksToShow;w++){
+    const row=el('div','week-row');
+    const rowLabel=el('div','week-row-label');
+    rowLabel.textContent='Woche '+(w+1);
+    row.appendChild(rowLabel);
+    for(let d=0;d<7;d++){
+      const dateKey=window.HomeRecurrence?window.HomeRecurrence.addDaysKey(weekStart,w*7+d):weekStart;
+      const isToday=dateKey===today;
+      const dayEl=el('div','week-day'+(isToday?' week-day--today':''));
+      const header=el('div','week-day__header');
+      const name=el('div','week-day__name');
+      name.textContent=dayNames[d];
+      const dateText=el('div','week-day__date');
+      dateText.textContent=window.HomeRecurrence?window.HomeRecurrence.formatGermanDate(dateKey):dateKey;
+      header.append(name,dateText);
+      const tasksContainer=el('div','week-day__tasks');
+      const fixedTasks=[];
+      for(const task of allTasks){
+        if(window.HomeWeekOverview&&window.HomeWeekOverview.isTaskDueOnDate(task,dateKey)){
+          fixedTasks.push({...task,type:'fixed'});
+        }
+      }
+      const plan=plansByDate.get(dateKey);
+      const freeTasks=[];
+      if(plan&&plan.tasks){
+        for(const t of plan.tasks){
+          if(!t.fixed){
+            freeTasks.push({...t,type:'free'});
+          }
+        }
+      }
+      const allDayTasks=[...fixedTasks,...freeTasks];
+      if(allDayTasks.length===0){
+        const empty=el('div','week-empty');
+        empty.textContent='Keine Aufgaben';
+        tasksContainer.appendChild(empty);
+      }else{
+        for(const t of allDayTasks){
+          const taskEl=el('div','week-task week-task--'+t.type+(t.status==='done'?' week-task--done':''));
+          taskEl.textContent=t.title;
+          const dur=el('span','week-task__duration');
+          dur.textContent=t.duration+' min';
+          taskEl.appendChild(dur);
+          tasksContainer.appendChild(taskEl);
+        }
+      }
+      const taskCount=el('span','week-task-count');
+      taskCount.textContent=String(allDayTasks.length);
+      header.appendChild(taskCount);
+      dayEl.append(header,tasksContainer);
+      row.appendChild(dayEl);
+    }
+    container.appendChild(row);
+  }
+}
 async function start(){
   try {
     await ensureDefaults();
@@ -831,6 +904,8 @@ async function start(){
     await renderStats();
     scheduleMidnightRefresh();
     showTutorialIfNeeded();
+    const versionEl = document.getElementById('settings-version');
+    if (versionEl) versionEl.textContent = 'v1.1.0';
   } catch (err) {
     console.error('Initialization error:', err);
     showToast('Fehler beim Laden: ' + (err.message || 'Unbekannter Fehler'));

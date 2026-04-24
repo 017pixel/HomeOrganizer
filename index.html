@@ -78,7 +78,12 @@
 <input type="file" id="import-file" accept="application/json" hidden>
 </div>
 <button type="button" id="danger-reset" class="btn btn-danger" style="margin-top:var(--space-md)">Daten vollständig zurücksetzen</button>
+<div class="settings-version" id="settings-version"></div>
 </div>
+</section>
+<section class="week-overview" hidden>
+<h2 class="section-title">Wochenübersicht</h2>
+<div class="week-grid" id="week-grid"></div>
 </section>
 </div>
 </main>
@@ -309,12 +314,14 @@ Erstelle feste Aufgaben mit flexiblen Intervallen (täglich, wöchentlich, monat
 <nav class="tabbar">
 <button class="tab active" data-tab="plan" aria-label="Plan"><span class="icon"><img src="assets/icons/material/calendar_today.svg" alt=""></span></button>
 <button class="tab" data-tab="tasks" aria-label="Aufgaben"><span class="icon"><img src="assets/icons/material/checklist.svg" alt=""></span></button>
+<button class="tab" data-tab="week" aria-label="Wochenübersicht"><span class="icon"><img src="assets/icons/material/calendar_month.svg" alt=""></span></button>
 <button class="tab" data-tab="stats" aria-label="Statistiken"><span class="icon"><img src="assets/icons/material/bar_chart.svg" alt=""></span></button>
 <button class="tab" data-tab="settings" aria-label="Einstellungen"><span class="icon"><img src="assets/icons/material/settings.svg" alt=""></span></button>
 </nav>
 </div>
 <script src="js/db/idb.js"></script>
 <script src="js/logic/recurrence.js"></script>
+<script src="js/logic/weekOverview.js"></script>
 <script src="js/logic/plannerCore.js"></script>
 <script src="js/logic/scheduler.js"></script>
 <script src="js/ui/cardStack.js"></script>

@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.3.0] - 2026-04-24
+
+### Erstellt
+- Mobile Wochenuebersicht mit horizontal scrollbaren Kartenreihen
+- Feste Karten-Groesse mit Seitenverhaeltnis fuer alle Bildschirmgroessen
+
+### Verändert
+- Wochenuebersicht CSS komplett ueberarbeitet fuer Handy und Fold 5
+- Task-Texte umbrechen nicht mehr vertikal, sondern mit Ellipsis
+- Mobile: 7 Tage als swipebare Kartenreihe statt eingequetschtem Grid
+- Tablet/Desktop: 7-Spalten Grid mit max-height statt endlos langen Karten
+
+---
+
 ## [1.2.0] - 2026-04-24
 
 ### Erstellt

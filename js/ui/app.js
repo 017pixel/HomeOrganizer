@@ -65,6 +65,9 @@ async function ensureDayRollover(){
   }
   const existing = await HomeDB.dailyPlans.get(today);
   if(!existing) await HomeScheduler.generateDailyPlan();
+  if(window.HomeScheduler && typeof window.HomeScheduler.ensurePlansForDays === 'function'){
+    await window.HomeScheduler.ensurePlansForDays(14);
+  }
 }
 function scheduleMidnightRefresh(){
   const now=new Date();
@@ -144,6 +147,10 @@ async function renderTasks(){
       onDelete: async (id) => {
         await HomeDB.tasks.del(parseInt(id, 10));
         await renderTasks();
+        if(window.HomeScheduler&&typeof window.HomeScheduler.regenerateFuturePlans==='function'&&window.HomeRecurrence){
+          const tomorrow=window.HomeRecurrence.addDaysKey(todayKey(),1);
+          await window.HomeScheduler.regenerateFuturePlans(tomorrow);
+        }
       }
     });
   }
@@ -312,6 +319,10 @@ function initActions(){
       try {
         await importData(file);
         showToast('Import erfolgreich');
+        if(window.HomeScheduler&&typeof window.HomeScheduler.regenerateFuturePlans==='function'&&window.HomeRecurrence){
+          const tomorrow=window.HomeRecurrence.addDaysKey(todayKey(),1);
+          await window.HomeScheduler.regenerateFuturePlans(tomorrow);
+        }
         await renderPlan();
         await renderTasks();
         await renderStats();
@@ -808,6 +819,10 @@ function openTaskModal(taskToEdit = null){
       await HomeDB.tasks.add(task);
     }
     await renderTasks();
+    if(window.HomeScheduler&&typeof window.HomeScheduler.regenerateFuturePlans==='function'&&window.HomeRecurrence){
+      const tomorrow=window.HomeRecurrence.addDaysKey(todayKey(),1);
+      await window.HomeScheduler.regenerateFuturePlans(tomorrow);
+    }
     close();
   };
 }
@@ -831,10 +846,8 @@ async function renderWeekOverview(){
   const weekStart=window.HomeRecurrence?window.HomeRecurrence.startOfWeekMondayKey(today):today;
   const weeksToShow=2;
   const dayNames=['Mo','Di','Mi','Do','Fr','Sa','So'];
-  let allTasks=[];
   let allPlans=[];
   try{
-    allTasks=await HomeDB.tasks.list();
     allPlans=await HomeDB.dailyPlans.list();
   }catch(e){console.error('Error loading week data:',e);}
   const plansByDate=new Map();
@@ -855,38 +868,29 @@ async function renderWeekOverview(){
       dateText.textContent=window.HomeRecurrence?window.HomeRecurrence.formatGermanDate(dateKey):dateKey;
       header.append(name,dateText);
       const tasksContainer=el('div','week-day__tasks');
-      const fixedTasks=[];
-      for(const task of allTasks){
-        if(window.HomeWeekOverview&&window.HomeWeekOverview.isTaskDueOnDate(task,dateKey)){
-          fixedTasks.push({...task,type:'fixed'});
-        }
-      }
       const plan=plansByDate.get(dateKey);
-      const freeTasks=[];
+      const dayTasks=[];
       if(plan&&plan.tasks){
         for(const t of plan.tasks){
-          if(!t.fixed){
-            freeTasks.push({...t,type:'free'});
-          }
+          dayTasks.push({...t,type:t.fixed?'fixed':'free'});
         }
       }
-      const allDayTasks=[...fixedTasks,...freeTasks];
-      if(allDayTasks.length===0){
+      if(dayTasks.length===0){
         const empty=el('div','week-empty');
         empty.textContent='Keine Aufgaben';
         tasksContainer.appendChild(empty);
       }else{
-        for(const t of allDayTasks){
+        for(const t of dayTasks){
           const taskEl=el('div','week-task week-task--'+t.type+(t.status==='done'?' week-task--done':''));
           taskEl.textContent=t.title;
           const dur=el('span','week-task__duration');
-          dur.textContent=t.duration+' min';
+          dur.textContent=(t.duration||0)+' min';
           taskEl.appendChild(dur);
           tasksContainer.appendChild(taskEl);
         }
       }
       const taskCount=el('span','week-task-count');
-      taskCount.textContent=String(allDayTasks.length);
+      taskCount.textContent=String(dayTasks.length);
       header.appendChild(taskCount);
       dayEl.append(header,tasksContainer);
       row.appendChild(dayEl);
@@ -905,7 +909,7 @@ async function start(){
     scheduleMidnightRefresh();
     showTutorialIfNeeded();
     const versionEl = document.getElementById('settings-version');
-    if (versionEl) versionEl.textContent = 'v1.1.0';
+    if (versionEl) versionEl.textContent = 'v1.2.0';
   } catch (err) {
     console.error('Initialization error:', err);
     showToast('Fehler beim Laden: ' + (err.message || 'Unbekannter Fehler'));

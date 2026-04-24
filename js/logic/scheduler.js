@@ -174,6 +174,28 @@ class DailyPlanner {
     if (direction === 'down' || direction === 'prev') return (currentIndex - 1 + totalCards) % totalCards;
     return currentIndex;
   }
+
+  async ensurePlansForDays(days = 14) {
+    const today = todayKey();
+    if (!window.HomeRecurrence) return;
+    for (let i = 0; i < days; i++) {
+      const dateKey = window.HomeRecurrence.addDaysKey(today, i);
+      let plan = await HomeDB.dailyPlans.get(dateKey);
+      if (!plan || !plan.tasks || plan.tasks.length < 3) {
+        await this.generateBalancedPlan(dateKey);
+      }
+    }
+  }
+
+  async regenerateFuturePlans(fromDateKey) {
+    const plans = await HomeDB.dailyPlans.list();
+    for (const plan of plans) {
+      if (plan.date >= fromDateKey) {
+        await HomeDB.dailyPlans.del(plan.date);
+      }
+    }
+    await this.ensurePlansForDays(14);
+  }
 }
 
 const planner = new DailyPlanner();
@@ -184,5 +206,7 @@ window.HomeScheduler = {
   swapTask: (date, oldId) => planner.swapTask(date, oldId),
   completeTask: (date, taskId) => planner.completeTask(date, taskId),
   completePlan: (date) => planner.completePlan(date),
-  getNextIndex: (idx, total, dir) => planner.getNextCardIndex(idx, total, dir)
+  getNextIndex: (idx, total, dir) => planner.getNextCardIndex(idx, total, dir),
+  ensurePlansForDays: (days) => planner.ensurePlansForDays(days),
+  regenerateFuturePlans: (fromDateKey) => planner.regenerateFuturePlans(fromDateKey)
 };

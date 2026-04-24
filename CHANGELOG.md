@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.2.0] - 2026-04-24
+
+### Erstellt
+- Automatische 14-Tage-Vorausplanung fuer feste und freie Aufgaben
+- Neue Plaene werden bei Task-Aenderungen automatisch neu generiert
+- Wochenuebersicht zeigt jetzt alle geplanten Aufgaben aus der Datenbank
+
+### Verändert
+- Scheduler erweitert um `ensurePlansForDays` und `regenerateFuturePlans`
+- Wochenuebersicht CSS zentriert und Fold 5 Optimierung verbessert
+- `renderWeekOverview` liest jetzt direkt aus `dailyPlans` statt live zu berechnen
+- Zukünftige Plaene werden ab morgen neu generiert, heutiger Plan bleibt erhalten
+- App-Start sichert jetzt automatisch Plaene fuer die naechsten 14 Tage
+
+### Gelöscht
+- Keine Eintraege
+
+---
+
 ## [1.1.0] - 2026-04-24
 
 ### Erstellt

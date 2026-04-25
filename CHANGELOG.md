@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.5.0] - 2026-04-25
+
+### Erstellt
+- 3-Tage-Ansicht mit gestern/heute/morgen als Standardlayout
+- Tag-fuer-Tag Navigation statt Wochen-Navigation
+- Dynamische KW-Anzeige passt sich an ueberlappende Kalenderwochen an
+
+### Verändert
+- Wochenuebersicht zeigt nur noch 3 Tage statt 7 Tage an
+- Navigation verschiebt das Fenster um 1 Tag statt 1 Woche
+- Handy Layout: 3 Tage untereinander statt Grid
+- Desktop Layout: 3 Tage nebeneinander ab 640px
+- Aufgaben-Overflow erhoeht auf 6 sichtbare Aufgaben pro Tag
+
+### Gelöscht
+- 7-Tage-Wochenansicht entfernt
+- Wochen-Label mit festem Montag-Sonntag Bereich
+
+---
+
 ## [1.4.0] - 2026-04-25
 
 ### Erstellt

@@ -846,10 +846,10 @@ async function renderStats(){
   const streak=await getStreak();
   const card3=el('div','card');const t3=el('div','card-title');t3.textContent='Streak';const m3=el('div','card-meta');m3.textContent=String(streak.count||0)+' Tage';card3.append(t3,m3);c.append(card3);
 }
-var currentWeekOffset=0;
-var MAX_WEEK_PAST=4;
-var MAX_WEEK_FUTURE=4;
-var MAX_DISPLAY_TASKS=4;
+var currentDayOffset=0;
+var MAX_DAY_PAST=30;
+var MAX_DAY_FUTURE=30;
+var MAX_DISPLAY_TASKS=6;
 
 function getWeekNumber(dateKey){
   var d=new Date(dateKey+'T12:00:00.000Z');
@@ -858,33 +858,33 @@ function getWeekNumber(dateKey){
   return Math.ceil((diff+((start.getUTCDay()+6)%7+1))/7);
 }
 
-function getMondayOfWeek(dateKey){
-  var d=new Date(dateKey+'T12:00:00.000Z');
-  var jsDay=d.getUTCDay();
-  var mondayOffset=(jsDay+6)%7;
-  d.setUTCDate(d.getUTCDate()-mondayOffset);
-  return d.toISOString().slice(0,10);
+function formatDayRange(firstKey,lastKey){
+  var firstFmt=window.HomeRecurrence?window.HomeRecurrence.formatGermanDate(firstKey):firstKey;
+  var lastFmt=window.HomeRecurrence?window.HomeRecurrence.formatGermanDate(lastKey):lastKey;
+  if(firstFmt===lastFmt)return firstFmt;
+  return firstFmt+' - '+lastFmt;
 }
 
-function formatWeekRange(mondayKey){
-  var sundayKey=window.HomeRecurrence?window.HomeRecurrence.addDaysKey(mondayKey,6):mondayKey;
-  var monFmt=window.HomeRecurrence?window.HomeRecurrence.formatGermanDate(mondayKey):mondayKey;
-  var sunFmt=window.HomeRecurrence?window.HomeRecurrence.formatGermanDate(sundayKey):sundayKey;
-  return monFmt+' - '+sunFmt;
+function getKwLabel(firstKey,lastKey){
+  var kw1=getWeekNumber(firstKey);
+  var kw2=getWeekNumber(lastKey);
+  if(kw1===kw2)return 'KW '+kw1;
+  return 'KW '+kw1+' / '+kw2;
 }
 
-async function getOrGeneratePlans(startDateKey){
+async function getOrGeneratePlansForDays(centerDateKey,dayCount){
   var entries=await HomeDB.dailyPlans.list();
   var map=new Map();
   for(var i=0;i<entries.length;i++){
     if(entries[i]&&entries[i].date)map.set(entries[i].date,entries[i]);
   }
-  for(var d=0;d<7;d++){
-    var dateKey=window.HomeRecurrence?window.HomeRecurrence.addDaysKey(startDateKey,d):startDateKey;
+  var half=Math.floor(dayCount/2);
+  for(var d=-half;d<=half;d++){
+    var dateKey=window.HomeRecurrence?window.HomeRecurrence.addDaysKey(centerDateKey,d):centerDateKey;
     if(!map.has(dateKey)){
       try{
         if(window.HomeScheduler&&typeof window.HomeScheduler.ensurePlansForDays==='function'){
-          await window.HomeScheduler.ensurePlansForDays(28);
+          await window.HomeScheduler.ensurePlansForDays(35);
         }
         var plan=await HomeDB.dailyPlans.get(dateKey);
         if(plan)map.set(dateKey,plan);
@@ -965,36 +965,36 @@ function showDayModal(dateKey){
   if(closeBtn)closeBtn.onclick=close;
 }
 
-async function renderWeekOverview(weekOffset){
-  if(typeof weekOffset!=='number')weekOffset=currentWeekOffset;
-  currentWeekOffset=weekOffset;
+async function renderWeekOverview(dayOffset){
+  if(typeof dayOffset!=='number')dayOffset=currentDayOffset;
+  currentDayOffset=dayOffset;
 
   var container=document.getElementById('week-grid');
   if(!container)return;
   container.innerHTML='';
 
   var today=todayKey();
-  var todayMonday=window.HomeRecurrence?window.HomeRecurrence.startOfWeekMondayKey(today):today;
-  var viewMonday=window.HomeRecurrence?window.HomeRecurrence.addDaysKey(todayMonday,weekOffset*7):todayMonday;
+  var centerDate=window.HomeRecurrence?window.HomeRecurrence.addDaysKey(today,dayOffset):today;
   var dayNames=['Mo','Di','Mi','Do','Fr','Sa','So'];
 
-  var plansByDate=await getOrGeneratePlans(viewMonday);
+  var plansByDate=await getOrGeneratePlansForDays(centerDate,3);
 
   var prevBtn=$('#week-prev');
   var nextBtn=$('#week-next');
   var labelEl=$('#week-nav-label');
-  if(prevBtn)prevBtn.disabled=weekOffset<=-MAX_WEEK_PAST;
-  if(nextBtn)nextBtn.disabled=weekOffset>=MAX_WEEK_FUTURE;
+  if(prevBtn)prevBtn.disabled=dayOffset<=-MAX_DAY_PAST;
+  if(nextBtn)nextBtn.disabled=dayOffset>=MAX_DAY_FUTURE;
   if(labelEl){
-    var kw=getWeekNumber(viewMonday);
-    var range=formatWeekRange(viewMonday);
-    labelEl.innerHTML='KW '+kw+' <span>'+range+'</span>';
+    var firstDate=window.HomeRecurrence?window.HomeRecurrence.addDaysKey(centerDate,-1):centerDate;
+    var lastDate=window.HomeRecurrence?window.HomeRecurrence.addDaysKey(centerDate,1):centerDate;
+    var kwLabel=getKwLabel(firstDate,lastDate);
+    var range=formatDayRange(firstDate,lastDate);
+    labelEl.innerHTML=kwLabel+' <span>'+range+'</span>';
   }
 
   var row=el('div','week-row');
-  for(var d=0;d<7;d++){
-    var dateKey=viewMonday;
-    if(window.HomeRecurrence)dateKey=window.HomeRecurrence.addDaysKey(viewMonday,d);
+  for(var d=-1;d<=1;d++){
+    var dateKey=window.HomeRecurrence?window.HomeRecurrence.addDaysKey(centerDate,d):centerDate;
     var isToday=dateKey===today;
     var dayEl=el('div','week-day'+(isToday?' week-day--today':''));
 
@@ -1004,7 +1004,9 @@ async function renderWeekOverview(weekOffset){
 
     var header=el('div','week-day__header');
     var name=el('div','week-day__name');
-    name.textContent=dayNames[d];
+    var jsDay=new Date(dateKey+'T12:00:00.000Z').getUTCDay();
+    var dwIndex=(jsDay+6)%7;
+    name.textContent=dayNames[dwIndex];
     var dateText=el('div','week-day__date');
     dateText.textContent=window.HomeRecurrence?window.HomeRecurrence.formatGermanDate(dateKey):dateKey;
     header.append(name,dateText);
@@ -1051,8 +1053,8 @@ async function renderWeekOverview(weekOffset){
 }
 
 function navigateWeek(delta){
-  var newOffset=currentWeekOffset+delta;
-  if(newOffset<-MAX_WEEK_PAST||newOffset>MAX_WEEK_FUTURE)return;
+  var newOffset=currentDayOffset+delta;
+  if(newOffset<-MAX_DAY_PAST||newOffset>MAX_DAY_FUTURE)return;
   renderWeekOverview(newOffset);
 }
 
@@ -1088,7 +1090,7 @@ async function start(){
     scheduleMidnightRefresh();
     showTutorialIfNeeded();
     const versionEl = document.getElementById('settings-version');
-    if (versionEl) versionEl.textContent = 'v1.4.0';
+    if (versionEl) versionEl.textContent = 'v1.5.0';
   } catch (err) {
     console.error('Initialization error:', err);
     showToast('Fehler beim Laden: ' + (err.message || 'Unbekannter Fehler'));

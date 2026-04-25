@@ -846,9 +846,9 @@ async function renderStats(){
   const streak=await getStreak();
   const card3=el('div','card');const t3=el('div','card-title');t3.textContent='Streak';const m3=el('div','card-meta');m3.textContent=String(streak.count||0)+' Tage';card3.append(t3,m3);c.append(card3);
 }
-var currentDayOffset=0;
-var MAX_DAY_PAST=30;
-var MAX_DAY_FUTURE=30;
+var currentBlockOffset=0;
+var MAX_BLOCK_PAST=10;
+var MAX_BLOCK_FUTURE=10;
 var MAX_DISPLAY_TASKS=6;
 
 function getWeekNumber(dateKey){
@@ -872,15 +872,14 @@ function getKwLabel(firstKey,lastKey){
   return 'KW '+kw1+' / '+kw2;
 }
 
-async function getOrGeneratePlansForDays(centerDateKey,dayCount){
+async function getOrGeneratePlansForDates(dateKeys){
   var entries=await HomeDB.dailyPlans.list();
   var map=new Map();
   for(var i=0;i<entries.length;i++){
     if(entries[i]&&entries[i].date)map.set(entries[i].date,entries[i]);
   }
-  var half=Math.floor(dayCount/2);
-  for(var d=-half;d<=half;d++){
-    var dateKey=window.HomeRecurrence?window.HomeRecurrence.addDaysKey(centerDateKey,d):centerDateKey;
+  for(var i=0;i<dateKeys.length;i++){
+    var dateKey=dateKeys[i];
     if(!map.has(dateKey)){
       try{
         if(window.HomeScheduler&&typeof window.HomeScheduler.ensurePlansForDays==='function'){
@@ -965,36 +964,41 @@ function showDayModal(dateKey){
   if(closeBtn)closeBtn.onclick=close;
 }
 
-async function renderWeekOverview(dayOffset){
-  if(typeof dayOffset!=='number')dayOffset=currentDayOffset;
-  currentDayOffset=dayOffset;
+async function renderWeekOverview(blockOffset){
+  if(typeof blockOffset!=='number')blockOffset=currentBlockOffset;
+  currentBlockOffset=blockOffset;
 
   var container=document.getElementById('week-grid');
   if(!container)return;
   container.innerHTML='';
 
   var today=todayKey();
-  var centerDate=window.HomeRecurrence?window.HomeRecurrence.addDaysKey(today,dayOffset):today;
+  var blockStart=window.HomeRecurrence?window.HomeRecurrence.addDaysKey(today,blockOffset*3-1):today;
   var dayNames=['Mo','Di','Mi','Do','Fr','Sa','So'];
 
-  var plansByDate=await getOrGeneratePlansForDays(centerDate,3);
+  var dateKeys=[];
+  for(var i=0;i<3;i++){
+    dateKeys.push(window.HomeRecurrence?window.HomeRecurrence.addDaysKey(blockStart,i):blockStart);
+  }
+
+  var plansByDate=await getOrGeneratePlansForDates(dateKeys);
 
   var prevBtn=$('#week-prev');
   var nextBtn=$('#week-next');
   var labelEl=$('#week-nav-label');
-  if(prevBtn)prevBtn.disabled=dayOffset<=-MAX_DAY_PAST;
-  if(nextBtn)nextBtn.disabled=dayOffset>=MAX_DAY_FUTURE;
+  if(prevBtn)prevBtn.disabled=blockOffset<=-MAX_BLOCK_PAST;
+  if(nextBtn)nextBtn.disabled=blockOffset>=MAX_BLOCK_FUTURE;
   if(labelEl){
-    var firstDate=window.HomeRecurrence?window.HomeRecurrence.addDaysKey(centerDate,-1):centerDate;
-    var lastDate=window.HomeRecurrence?window.HomeRecurrence.addDaysKey(centerDate,1):centerDate;
+    var firstDate=dateKeys[0];
+    var lastDate=dateKeys[2];
     var kwLabel=getKwLabel(firstDate,lastDate);
     var range=formatDayRange(firstDate,lastDate);
     labelEl.innerHTML=kwLabel+' <span>'+range+'</span>';
   }
 
   var row=el('div','week-row');
-  for(var d=-1;d<=1;d++){
-    var dateKey=window.HomeRecurrence?window.HomeRecurrence.addDaysKey(centerDate,d):centerDate;
+  for(var i=0;i<3;i++){
+    var dateKey=dateKeys[i];
     var isToday=dateKey===today;
     var dayEl=el('div','week-day'+(isToday?' week-day--today':''));
 
@@ -1053,8 +1057,8 @@ async function renderWeekOverview(dayOffset){
 }
 
 function navigateWeek(delta){
-  var newOffset=currentDayOffset+delta;
-  if(newOffset<-MAX_DAY_PAST||newOffset>MAX_DAY_FUTURE)return;
+  var newOffset=currentBlockOffset+delta;
+  if(newOffset<-MAX_BLOCK_PAST||newOffset>MAX_BLOCK_FUTURE)return;
   renderWeekOverview(newOffset);
 }
 
@@ -1090,7 +1094,7 @@ async function start(){
     scheduleMidnightRefresh();
     showTutorialIfNeeded();
     const versionEl = document.getElementById('settings-version');
-    if (versionEl) versionEl.textContent = 'v1.5.0';
+    if (versionEl) versionEl.textContent = 'v1.5.1';
   } catch (err) {
     console.error('Initialization error:', err);
     showToast('Fehler beim Laden: ' + (err.message || 'Unbekannter Fehler'));

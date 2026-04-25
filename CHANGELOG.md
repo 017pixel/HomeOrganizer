@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.5.1] - 2026-04-25
+
+### Verändert
+- Navigation springt jetzt um 3 Tage statt 1 Tag
+- 3-Tage-Bloecke sind jetzt disjunkt, keine Ueberlappung mehr
+- KW-Anzeige basiert direkt auf den 3 angezeigten Tagen
+
+### Gelöscht
+- Ueberlappende Tage bei der Navigation entfernt
+- Veraltete centerDate-Logik durch blockbasierte Berechnung ersetzt
+
+---
+
 ## [1.5.0] - 2026-04-25
 
 ### Erstellt

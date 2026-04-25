@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.4.0] - 2026-04-25
+
+### Erstellt
+- Wochen-Navigation mit Pfeilen und Swipe-Geste fuer vorherige/nachste Wochen
+- Interaktive Tageskarten mit Modal-Ansicht fuer alle Aufgaben des Tages
+- Aufgaben-Overflow Indikator zeigt '+X mehr' wenn mehr als 4 Aufgaben vorhanden
+- Sticky Wochen-Navigationsleiste zeigt Kalenderwoche und Datumsbereich
+- Tages-Modal mit Zusammenfassung Aufgabenzahl und Gesamtdauer
+
+### Verändert
+- Handy Hochformat Layout: 3-Tage-Bloecke (Mo-Mi / Do-Sa / So) statt horizontalem Scrollen
+- Fold 5 aufgeklappt: 7-Spalten Grid ab 520px statt horizontalem Scrollen
+- CSS Breakpoints angepasst: 520px statt 768px fuer Grid-Umschaltung
+- Schriftgroesse auf mindestens 12px angehoben fuer bessere Lesbarkeit
+- Wochen-Label aus Scroll-Container entfernt und als sticky Ueberschrift platziert
+
+### Gelöscht
+- Horizontales Scrollen in der Wochenuebersicht auf allen Bildschirmen
+- Feste Kartenhoehe von 170px auf Mobile
+
+---
+
 ## [1.3.0] - 2026-04-24
 
 ### Erstellt

@@ -82,9 +82,22 @@
 </div>
 </section>
 <section class="week-overview" hidden>
-<h2 class="section-title">Wochenübersicht</h2>
-<div class="week-grid" id="week-grid"></div>
+  <div class="week-nav">
+    <button class="btn-icon week-nav__btn" id="week-prev" aria-label="Vorherige Woche"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button>
+    <div class="week-nav__label" id="week-nav-label">KW ? -- ?</div>
+    <button class="btn-icon week-nav__btn" id="week-next" aria-label="Nächste Woche"><svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg></button>
+  </div>
+  <div class="week-grid" id="week-grid"></div>
 </section>
+<div id="day-modal-backdrop" class="modal-backdrop" aria-hidden="true">
+  <div id="day-modal" class="modal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal__header">
+      <div class="modal__title" id="day-modal-title"></div>
+      <button class="modal__close btn-icon" id="day-modal-close" aria-label="Schliessen"><svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+    </div>
+    <div class="modal__body" id="day-modal-body"></div>
+  </div>
+</div>
 </div>
 </main>
 <div id="modal-backdrop" class="modal-backdrop" aria-hidden="true">

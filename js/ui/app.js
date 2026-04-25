@@ -241,7 +241,7 @@ function initTabs(){
         await renderTasks();
         showUpdatePopupIfNeeded();
       }
-      if (tab==='week') await renderWeekOverview();
+      if (tab==='week') await renderWeekOverview(0);
       if (tab==='stats') await renderStats();
     } catch (err) {
       console.error(`Error rendering tab ${tab}:`, err);
@@ -265,6 +265,14 @@ function initTabs(){
   setActiveTab('plan');
 }
 function initActions(){
+  const weekPrev=$('#week-prev');
+  if(weekPrev)weekPrev.onclick=()=>navigateWeek(-1);
+  const weekNext=$('#week-next');
+  if(weekNext)weekNext.onclick=()=>navigateWeek(1);
+
+  var weekGrid=$('#week-grid');
+  if(weekGrid)initWeekSwipe(weekGrid);
+
   const shuffleBtn=$('#shuffle');
   if (shuffleBtn) shuffleBtn.onclick=async()=>{
     if (!cardStackManager) await renderPlan();
@@ -838,65 +846,236 @@ async function renderStats(){
   const streak=await getStreak();
   const card3=el('div','card');const t3=el('div','card-title');t3.textContent='Streak';const m3=el('div','card-meta');m3.textContent=String(streak.count||0)+' Tage';card3.append(t3,m3);c.append(card3);
 }
-async function renderWeekOverview(){
-  const container=document.getElementById('week-grid');
+var currentWeekOffset=0;
+var MAX_WEEK_PAST=4;
+var MAX_WEEK_FUTURE=4;
+var MAX_DISPLAY_TASKS=4;
+
+function getWeekNumber(dateKey){
+  var d=new Date(dateKey+'T12:00:00.000Z');
+  var start=new Date(Date.UTC(d.getUTCFullYear(),0,1));
+  var diff=(d-start)/86400000;
+  return Math.ceil((diff+((start.getUTCDay()+6)%7+1))/7);
+}
+
+function getMondayOfWeek(dateKey){
+  var d=new Date(dateKey+'T12:00:00.000Z');
+  var jsDay=d.getUTCDay();
+  var mondayOffset=(jsDay+6)%7;
+  d.setUTCDate(d.getUTCDate()-mondayOffset);
+  return d.toISOString().slice(0,10);
+}
+
+function formatWeekRange(mondayKey){
+  var sundayKey=window.HomeRecurrence?window.HomeRecurrence.addDaysKey(mondayKey,6):mondayKey;
+  var monFmt=window.HomeRecurrence?window.HomeRecurrence.formatGermanDate(mondayKey):mondayKey;
+  var sunFmt=window.HomeRecurrence?window.HomeRecurrence.formatGermanDate(sundayKey):sundayKey;
+  return monFmt+' - '+sunFmt;
+}
+
+async function getOrGeneratePlans(startDateKey){
+  var entries=await HomeDB.dailyPlans.list();
+  var map=new Map();
+  for(var i=0;i<entries.length;i++){
+    if(entries[i]&&entries[i].date)map.set(entries[i].date,entries[i]);
+  }
+  for(var d=0;d<7;d++){
+    var dateKey=window.HomeRecurrence?window.HomeRecurrence.addDaysKey(startDateKey,d):startDateKey;
+    if(!map.has(dateKey)){
+      try{
+        if(window.HomeScheduler&&typeof window.HomeScheduler.ensurePlansForDays==='function'){
+          await window.HomeScheduler.ensurePlansForDays(28);
+        }
+        var plan=await HomeDB.dailyPlans.get(dateKey);
+        if(plan)map.set(dateKey,plan);
+      }catch(e){}
+    }
+  }
+  return map;
+}
+
+function showDayModal(dateKey){
+  var b=$('#day-modal-backdrop');
+  var m=$('#day-modal');
+  if(!b||!m)return;
+  var titleEl=$('#day-modal-title');
+  var bodyEl=$('#day-modal-body');
+  if(!titleEl||!bodyEl)return;
+
+  var formattedDate=window.HomeRecurrence?window.HomeRecurrence.formatGermanDate(dateKey):dateKey;
+  var dayNames=['Mo','Di','Mi','Do','Fr','Sa','So'];
+  var d=new Date(dateKey+'T12:00:00.000Z');
+  var jsDay=d.getUTCDay();
+  var dwIndex=(jsDay+6)%7;
+  var dwName=dayNames[dwIndex]||'';
+  titleEl.textContent=dwName+' '+formattedDate;
+
+  HomeDB.dailyPlans.get(dateKey).then(function(plan){
+    bodyEl.innerHTML='';
+    var dayTasks=[];
+    if(plan&&plan.tasks){
+      for(var i=0;i<plan.tasks.length;i++){
+        dayTasks.push({title:plan.tasks[i].title,duration:plan.tasks[i].duration||0,type:plan.tasks[i].fixed?'fixed':'free',status:plan.tasks[i].status||''});
+      }
+    }
+    if(dayTasks.length===0){
+      var empty=el('div','week-empty');
+      empty.textContent='Keine Aufgaben';
+      bodyEl.appendChild(empty);
+    }else{
+      for(var i=0;i<dayTasks.length;i++){
+        var t=dayTasks[i];
+        var taskEl=el('div','week-task week-task--'+t.type+(t.status==='done'?' week-task--done':''));
+        var titleSpan=document.createElement('span');
+        titleSpan.textContent=t.title;
+        titleSpan.style.flex='1';
+        taskEl.appendChild(titleSpan);
+        var dur=el('span','week-task__duration');
+        dur.textContent=t.duration+' min';
+        taskEl.appendChild(dur);
+        bodyEl.appendChild(taskEl);
+      }
+      var totalMin=dayTasks.reduce(function(s,t){return s+(t.duration||0);},0);
+      var summary=el('div');
+      summary.style.cssText='margin-top:var(--space-md);padding-top:var(--space-sm);border-top:var(--border-2) solid var(--border-color);font-weight:var(--font-bold);font-size:var(--text-sm);text-align:right;color:var(--text-secondary)';
+      summary.textContent=dayTasks.length+' Aufgaben  '+totalMin+' min gesamt';
+      bodyEl.appendChild(summary);
+    }
+  });
+
+  var previouslyFocused=document.activeElement;
+  b.classList.add('open');
+  b.setAttribute('aria-hidden','false');
+  m.classList.add('open');
+  m.setAttribute('aria-hidden','false');
+  var close=function(){
+    m.classList.remove('open');
+    m.setAttribute('aria-hidden','true');
+    b.classList.remove('open');
+    b.setAttribute('aria-hidden','true');
+    document.removeEventListener('keydown',onKeyDown);
+    if(previouslyFocused&&typeof previouslyFocused.focus==='function')previouslyFocused.focus();
+  };
+  var onKeyDown=function(e){
+    if(e.key==='Escape'){e.preventDefault();close();}
+  };
+  document.addEventListener('keydown',onKeyDown);
+  b.onclick=function(e){if(e.target===b)close();};
+  var closeBtn=$('#day-modal-close');
+  if(closeBtn)closeBtn.onclick=close;
+}
+
+async function renderWeekOverview(weekOffset){
+  if(typeof weekOffset!=='number')weekOffset=currentWeekOffset;
+  currentWeekOffset=weekOffset;
+
+  var container=document.getElementById('week-grid');
   if(!container)return;
   container.innerHTML='';
-  const today=todayKey();
-  const weekStart=window.HomeRecurrence?window.HomeRecurrence.startOfWeekMondayKey(today):today;
-  const weeksToShow=2;
-  const dayNames=['Mo','Di','Mi','Do','Fr','Sa','So'];
-  let allPlans=[];
-  try{
-    allPlans=await HomeDB.dailyPlans.list();
-  }catch(e){console.error('Error loading week data:',e);}
-  const plansByDate=new Map();
-  for(const plan of allPlans){if(plan&&plan.date)plansByDate.set(plan.date,plan);}
-  for(let w=0;w<weeksToShow;w++){
-    const row=el('div','week-row');
-    const rowLabel=el('div','week-row-label');
-    rowLabel.textContent='Woche '+(w+1);
-    row.appendChild(rowLabel);
-    for(let d=0;d<7;d++){
-      const dateKey=window.HomeRecurrence?window.HomeRecurrence.addDaysKey(weekStart,w*7+d):weekStart;
-      const isToday=dateKey===today;
-      const dayEl=el('div','week-day'+(isToday?' week-day--today':''));
-      const header=el('div','week-day__header');
-      const name=el('div','week-day__name');
-      name.textContent=dayNames[d];
-      const dateText=el('div','week-day__date');
-      dateText.textContent=window.HomeRecurrence?window.HomeRecurrence.formatGermanDate(dateKey):dateKey;
-      header.append(name,dateText);
-      const tasksContainer=el('div','week-day__tasks');
-      const plan=plansByDate.get(dateKey);
-      const dayTasks=[];
-      if(plan&&plan.tasks){
-        for(const t of plan.tasks){
-          dayTasks.push({...t,type:t.fixed?'fixed':'free'});
-        }
-      }
-      if(dayTasks.length===0){
-        const empty=el('div','week-empty');
-        empty.textContent='Keine Aufgaben';
-        tasksContainer.appendChild(empty);
-      }else{
-        for(const t of dayTasks){
-          const taskEl=el('div','week-task week-task--'+t.type+(t.status==='done'?' week-task--done':''));
-          taskEl.textContent=t.title;
-          const dur=el('span','week-task__duration');
-          dur.textContent=(t.duration||0)+' min';
-          taskEl.appendChild(dur);
-          tasksContainer.appendChild(taskEl);
-        }
-      }
-      const taskCount=el('span','week-task-count');
-      taskCount.textContent=String(dayTasks.length);
-      header.appendChild(taskCount);
-      dayEl.append(header,tasksContainer);
-      row.appendChild(dayEl);
-    }
-    container.appendChild(row);
+
+  var today=todayKey();
+  var todayMonday=window.HomeRecurrence?window.HomeRecurrence.startOfWeekMondayKey(today):today;
+  var viewMonday=window.HomeRecurrence?window.HomeRecurrence.addDaysKey(todayMonday,weekOffset*7):todayMonday;
+  var dayNames=['Mo','Di','Mi','Do','Fr','Sa','So'];
+
+  var plansByDate=await getOrGeneratePlans(viewMonday);
+
+  var prevBtn=$('#week-prev');
+  var nextBtn=$('#week-next');
+  var labelEl=$('#week-nav-label');
+  if(prevBtn)prevBtn.disabled=weekOffset<=-MAX_WEEK_PAST;
+  if(nextBtn)nextBtn.disabled=weekOffset>=MAX_WEEK_FUTURE;
+  if(labelEl){
+    var kw=getWeekNumber(viewMonday);
+    var range=formatWeekRange(viewMonday);
+    labelEl.innerHTML='KW '+kw+' <span>'+range+'</span>';
   }
+
+  var row=el('div','week-row');
+  for(var d=0;d<7;d++){
+    var dateKey=viewMonday;
+    if(window.HomeRecurrence)dateKey=window.HomeRecurrence.addDaysKey(viewMonday,d);
+    var isToday=dateKey===today;
+    var dayEl=el('div','week-day'+(isToday?' week-day--today':''));
+
+    (function(dk){
+      dayEl.onclick=function(){showDayModal(dk);};
+    })(dateKey);
+
+    var header=el('div','week-day__header');
+    var name=el('div','week-day__name');
+    name.textContent=dayNames[d];
+    var dateText=el('div','week-day__date');
+    dateText.textContent=window.HomeRecurrence?window.HomeRecurrence.formatGermanDate(dateKey):dateKey;
+    header.append(name,dateText);
+
+    var tasksContainer=el('div','week-day__tasks');
+    var plan=plansByDate.get(dateKey);
+    var dayTasks=[];
+    if(plan&&plan.tasks){
+      for(var t=0;t<plan.tasks.length;t++){
+        dayTasks.push({title:plan.tasks[t].title,duration:plan.tasks[t].duration||0,type:plan.tasks[t].fixed?'fixed':'free',status:plan.tasks[t].status||''});
+      }
+    }
+    if(dayTasks.length===0){
+      var empty=el('div','week-empty');
+      empty.textContent='Keine Aufgaben';
+      tasksContainer.appendChild(empty);
+    }else{
+      var tasksToShow=dayTasks.slice(0,MAX_DISPLAY_TASKS);
+      for(var ti=0;ti<tasksToShow.length;ti++){
+        var t=tasksToShow[ti];
+        var taskEl=el('div','week-task week-task--'+t.type+(t.status==='done'?' week-task--done':''));
+        taskEl.textContent=t.title;
+        var dur=el('span','week-task__duration');
+        dur.textContent=t.duration+' min';
+        taskEl.appendChild(dur);
+        tasksContainer.appendChild(taskEl);
+      }
+      var remaining=dayTasks.length-MAX_DISPLAY_TASKS;
+      if(remaining>0){
+        var moreEl=el('div','week-more');
+        moreEl.textContent='+'+remaining+' mehr';
+        (function(dk){moreEl.onclick=function(e){e.stopPropagation();showDayModal(dk);};})(dateKey);
+        tasksContainer.appendChild(moreEl);
+      }
+    }
+
+    var taskCount=el('span','week-task-count');
+    taskCount.textContent=String(dayTasks.length);
+    header.appendChild(taskCount);
+    dayEl.append(header,tasksContainer);
+    row.appendChild(dayEl);
+  }
+  container.appendChild(row);
+}
+
+function navigateWeek(delta){
+  var newOffset=currentWeekOffset+delta;
+  if(newOffset<-MAX_WEEK_PAST||newOffset>MAX_WEEK_FUTURE)return;
+  renderWeekOverview(newOffset);
+}
+
+function initWeekSwipe(gridEl){
+  var startX=0;
+  var deltaX=0;
+  var tracking=false;
+  gridEl.addEventListener('touchstart',function(e){
+    if(e.touches.length!==1)return;
+    startX=e.touches[0].clientX;
+    deltaX=0;
+    tracking=true;
+  },{passive:true});
+  gridEl.addEventListener('touchmove',function(e){
+    if(!tracking)return;
+    deltaX=e.touches[0].clientX-startX;
+  },{passive:true});
+  gridEl.addEventListener('touchend',function(){
+    if(!tracking)return;
+    if(deltaX<-50)navigateWeek(1);
+    else if(deltaX>50)navigateWeek(-1);
+    tracking=false;
+  });
 }
 async function start(){
   try {
@@ -909,7 +1088,7 @@ async function start(){
     scheduleMidnightRefresh();
     showTutorialIfNeeded();
     const versionEl = document.getElementById('settings-version');
-    if (versionEl) versionEl.textContent = 'v1.3.0';
+    if (versionEl) versionEl.textContent = 'v1.4.0';
   } catch (err) {
     console.error('Initialization error:', err);
     showToast('Fehler beim Laden: ' + (err.message || 'Unbekannter Fehler'));

@@ -36,7 +36,7 @@ function toPlanTask(task) {
 }
 
 class DailyPlanner {
-  async generateBalancedPlan(dateKey = todayKey()) {
+  async generateBalancedPlan(dateKey = todayKey(), excludeTaskIds = new Set()) {
     const tasks = await HomeDB.tasks.list();
     const minutes = await getAvailableMinutes(dateKey);
 
@@ -71,7 +71,7 @@ class DailyPlanner {
 
     let result = null;
     if (window.HomePlannerCore && typeof window.HomePlannerCore.buildPlanTasks === 'function') {
-      result = window.HomePlannerCore.buildPlanTasks({ dateKey, tasks: normalized, minutes, maxTasks: 3 });
+      result = window.HomePlannerCore.buildPlanTasks({ dateKey, tasks: normalized, minutes, maxTasks: 3, excludeTaskIds });
     }
 
     const plan = {
@@ -90,6 +90,24 @@ class DailyPlanner {
     const key = todayKey();
     let plan = await HomeDB.dailyPlans.get(key);
     if (!plan || !plan.tasks || plan.tasks.length < 3) plan = await this.generateBalancedPlan(key);
+
+    if (plan && plan.tasks && window.HomeRecurrence) {
+      const hasCompleted = plan.tasks.some(t => t.status === 'done');
+      if (!hasCompleted) {
+        const yesterdayKey = window.HomeRecurrence.addDaysKey(key, -1);
+        const yesterdayPlan = await HomeDB.dailyPlans.get(yesterdayKey);
+        if (yesterdayPlan && yesterdayPlan.tasks) {
+          const yesterdayFreeIds = new Set(yesterdayPlan.tasks.filter(t => !t.fixed).map(t => t.id));
+          const todayFreeTasks = plan.tasks.filter(t => !t.fixed);
+          const hasOverlap = todayFreeTasks.some(t => yesterdayFreeIds.has(t.id));
+          if (hasOverlap) {
+            const excludeIds = new Set();
+            yesterdayPlan.tasks.forEach(t => excludeIds.add(t.id));
+            plan = await this.generateBalancedPlan(key, excludeIds);
+          }
+        }
+      }
+    }
 
     if (plan.date !== key) plan.date = key;
     if (typeof plan.swapsRemaining !== 'number') plan.swapsRemaining = 3;
@@ -182,7 +200,15 @@ class DailyPlanner {
       const dateKey = window.HomeRecurrence.addDaysKey(today, i);
       let plan = await HomeDB.dailyPlans.get(dateKey);
       if (!plan || !plan.tasks || plan.tasks.length < 3) {
-        await this.generateBalancedPlan(dateKey);
+        const excludeTaskIds = new Set();
+        for (let j = Math.max(0, i - 3); j < i; j++) {
+          const prevDate = window.HomeRecurrence.addDaysKey(today, j);
+          const prevPlan = await HomeDB.dailyPlans.get(prevDate);
+          if (prevPlan && prevPlan.tasks) {
+            prevPlan.tasks.forEach(t => excludeTaskIds.add(t.id));
+          }
+        }
+        await this.generateBalancedPlan(dateKey, excludeTaskIds);
       }
     }
   }

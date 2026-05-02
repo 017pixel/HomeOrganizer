@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.6.0] - 2026-05-02
+
+### Erstellt
+- Free-Task-Rotation: Aufgaben erscheinen nicht mehr an aufeinanderfolgenden Tagen
+- Max 1 t\u00e4gliche feste Aufgabe pro Tag (Custom-Intervall/Tag)
+- \u00dcberlappungspr\u00fcfung beim App-Start: heutige Free-Tasks werden gegen gestern gepr\u00fcft
+
+### Ver\u00e4ndert
+- Standard-Wiederholung im Aufgabendialog von "Keine (frei)" auf "Zuf\u00e4llig" ge\u00e4ndert
+- Plan-Generierung schliesst Tasks der letzten 3 Tage aus
+- Heutiger Plan wird nur regeneriert wenn nichts erledigt wurde
+
+---
+
 ## [1.5.1] - 2026-04-25
 
 ### Verändert

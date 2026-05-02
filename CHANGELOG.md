@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.7.0] - 2026-05-02
+
+### Erstellt
+- Statistik-Seite mit 5 neuen Diagrammen und Charts
+- Wochentage-Verteilung als Balkendiagramm
+- Aufgaben-nach-Dauer-Verteilung als SVG-Donut
+- W\u00f6chentlicher Trend \u00fcber 8 Wochen als Balken
+- Fixed-vs-Frei-Vergleich als gestapelte Balken
+- Tageszeit-Analyse mit 4 Zeitbl\u00f6cken (Morgen/Mittag/Nachmittag/Abend)
+- Neues statsEngine.js Modul zur Daten-Aggregation
+- completedAt-Zeitstempel beim Abhaken von Aufgaben
+
+### Ver\u00e4ndert
+- renderStats() komplett \u00fcberarbeitet mit Chart-Rendering
+- Stats-Layout auf 1-spaltige Cards umgestellt
+- Chart-Styles in design-system.css integriert
+- Balken-, Donut- und Stack-Chart-Renderer in app.js
+
+---
+
 ## [1.6.0] - 2026-05-02
 
 ### Erstellt

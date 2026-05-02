@@ -836,15 +836,194 @@ function openTaskModal(taskToEdit = null){
 }
 async function renderStats(){
   const c=$('#stats-container');if(!c)return;c.innerHTML='';
+
   const plan=await getOrFixTodayPlan();
-  const total=Math.max(3, plan.tasks.length);
+  const total=Math.max(3,plan.tasks.length);
   const done=plan.tasks.filter(t=>t.status==='done').length;
-  const card1=el('div','card');const t1=el('div','card-title');t1.textContent='Heute erledigt';const m1=el('div','card-meta');m1.textContent=done+' / '+total;card1.append(t1,m1);c.append(card1);
-  const plans=await HomeDB.dailyPlans.list();
-  const allTimeDone=plans.reduce((sum,p)=>sum+(p.tasks||[]).filter(x=>x.status==='done').length,0);
-  const card2=el('div','card');const t2=el('div','card-title');t2.textContent='Insgesamt schon erledigt';const m2=el('div','card-meta');m2.textContent=String(allTimeDone);card2.append(t2,m2);c.append(card2);
+  const allPlans=await HomeDB.dailyPlans.list();
+  const allTimeDone=allPlans.reduce((s,p)=>s+(p.tasks||[]).filter(x=>x.status==='done').length,0);
   const streak=await getStreak();
-  const card3=el('div','card');const t3=el('div','card-title');t3.textContent='Streak';const m3=el('div','card-meta');m3.textContent=String(streak.count||0)+' Tage';card3.append(t3,m3);c.append(card3);
+
+  const weekdays=window.HomeStats?await window.HomeStats.weekdayDistribution():null;
+  const difficulty=window.HomeStats?await window.HomeStats.difficultyDistribution():null;
+  const trend=window.HomeStats?await window.HomeStats.weeklyTrend():null;
+  const fixedfree=window.HomeStats?await window.HomeStats.fixedVsFree():null;
+  const timeDist=window.HomeStats?await window.HomeStats.timeOfDayDistribution():null;
+
+  function sc(title){
+    const card=el('div','stats-card');
+    const header=el('div','stats-card__header');
+    const t=el('div','stats-card__title');t.textContent=title;
+    header.append(t);
+    card.append(header);
+    const body=el('div','stats-card__chart');
+    card.append(body);
+    return {card,header,body};
+  }
+
+  function addMeta(card,text){
+    const m=el('div','stats-card__meta');m.textContent=text;
+    card.append(m);
+  }
+
+  function addTotal(header,text){
+    const tot=el('span','stats-card__total');tot.textContent=text;
+    header.append(tot);
+  }
+
+  function renderBars(container,bars,opt={}){
+    const wrap=el('div','chart-bars'+(opt.timeClass?' chart-bars--time':''));
+    for(const b of bars){
+      const col=el('div','chart-bar'+(opt.timeClass?' chart-bar--time':''));
+      const fill=el('div','chart-bar__fill');
+      fill.style.height=Math.max(b.pct||1,4)+'%';
+      if(b.isBest)fill.classList.add('chart-bar__fill--best');
+      if(b.isCurrent)fill.classList.add('chart-bar__fill--current');
+      col.append(fill);
+      if(opt.showVal!==false){
+        const val=el('div','chart-bar__value');val.textContent=String(b.value);
+        col.append(val);
+      }
+      const lbl=el('div','chart-bar__label');
+      if(opt.labels&&opt.labels[b.label])lbl.textContent=opt.labels[b.label];
+      else lbl.textContent=opt.labelShort?b.labelShort:b.label;
+      col.append(lbl);
+      wrap.append(col);
+    }
+    container.append(wrap);
+  }
+
+  function renderDonut(container,segments){
+    const wrap=el('div','chart-donut-wrapper');
+    const svgWrap=el('div','chart-donut');
+    const total=segments.reduce((s,seg)=>s+seg.value,0)||1;
+    const circumference=2*Math.PI*38;
+    const cx=50,cy=50,r=38,strokeW=16;
+    let offset=0;
+    const ns='http://www.w3.org/2000/svg';
+    const svg=document.createElementNS(ns,'svg');
+    svg.setAttribute('viewBox','0 0 100 100');
+    const bg=document.createElementNS(ns,'circle');
+    bg.setAttribute('cx',String(cx));bg.setAttribute('cy',String(cy));
+    bg.setAttribute('r',String(r));bg.setAttribute('fill','none');
+    bg.setAttribute('stroke','var(--border-color)');bg.setAttribute('stroke-width',String(strokeW));
+    svg.append(bg);
+    for(const seg of segments){
+      if(seg.value===0)continue;
+      const pct=seg.value/total;
+      const dash=pct*circumference;
+      const circle=document.createElementNS(ns,'circle');
+      circle.setAttribute('cx',String(cx));circle.setAttribute('cy',String(cy));
+      circle.setAttribute('r',String(r));circle.setAttribute('fill','none');
+      circle.setAttribute('stroke',seg.color);
+      circle.setAttribute('stroke-width',String(strokeW));
+      circle.setAttribute('stroke-dasharray',dash+' '+(circumference-dash));
+      circle.setAttribute('stroke-dashoffset',String(-offset));
+      circle.setAttribute('transform','rotate(-90 50 50)');
+      svg.append(circle);
+      offset+=dash;
+    }
+    svgWrap.append(svg);
+    wrap.append(svgWrap);
+    const legend=el('div','chart-legend');
+    for(const seg of segments){
+      const item=el('div','chart-legend__item');
+      const dot=el('span','chart-legend__dot');dot.style.background=seg.color;
+      const lbl=el('span','');lbl.textContent=seg.label;
+      const pct=el('span','chart-legend__pct');pct.textContent=seg.pct+'%';
+      item.append(dot,lbl,pct);
+      legend.append(item);
+    }
+    wrap.append(legend);
+    container.append(wrap);
+  }
+
+  function renderStacked(container,bars){
+    const wrap=el('div','chart-stacked');
+    for(const b of bars){
+      const col=el('div','chart-stacked__bar');
+      const fixedH=Math.max(b.fixed/(b.fixed+b.free||1)*(b.pct||1)||0,2);
+      const freeH=Math.max(b.free/(b.fixed+b.free||1)*(b.pct||1)||0,2);
+      const fixedBar=el('div','chart-stacked__segment chart-stacked__segment--fixed');
+      fixedBar.style.height=Math.round(fixedH)+'%';
+      if(b.isCurrent)fixedBar.style.boxShadow='0 0 0 1px var(--accent-primary)';
+      const freeBar=el('div','chart-stacked__segment chart-stacked__segment--free');
+      freeBar.style.height=Math.round(freeH)+'%';
+      if(b.isCurrent)freeBar.style.boxShadow='0 0 0 1px var(--accent-secondary)';
+      col.append(fixedBar,freeBar);
+      const lbl=el('div','chart-stacked__label');lbl.textContent=b.label;
+      col.append(lbl);
+      wrap.append(col);
+    }
+    container.append(wrap);
+  }
+
+  /* Karte 1: Basis-Stats */
+  (()=>{
+    const {card,header,body}=sc('Übersicht');
+    addTotal(header,'Heute');
+    body.style.display='flex';
+    body.style.gap='var(--space-lg)';
+    body.style.justifyContent='center';
+    body.style.textAlign='center';
+    const cols=[
+      {label:'Heute',value:done+' / '+total,sub:'erledigt'},
+      {label:'Gesamt',value:String(allTimeDone),sub:'erledigt'},
+      {label:'Serie',value:String(streak.count||0)+' Tage',sub:'aktuelle Streak'}
+    ];
+    for(const col of cols){
+      const d=el('div','');
+      const v=el('div','');v.style.fontSize='var(--text-xxl,28px)';v.style.fontWeight='var(--font-black)';v.style.fontFamily='var(--font-display)';v.style.color='var(--accent-primary)';v.style.lineHeight='1';v.textContent=col.value;
+      const l=el('div','');l.style.fontSize='var(--text-xs)';l.style.color='var(--text-secondary)';l.textContent=col.sub;
+      d.append(v,l);
+      body.append(d);
+    }
+    c.append(card);
+  })();
+
+  /* Karte 2: Wochentage */
+  if(weekdays){
+    const {card,header,body}=sc('Wochentage');
+    addTotal(header,String(weekdays.total)+' ges.');
+    renderBars(body,weekdays.bars);
+    if(weekdays.bestDay)addMeta(card,'Bester Tag: '+weekdays.bestDay);
+    c.append(card);
+  }
+
+  /* Karte 3: Nach Dauer */
+  if(difficulty){
+    const {card,header,body}=sc('Nach Dauer');
+    addTotal(header,String(difficulty.total)+' ges.');
+    renderDonut(body,difficulty.segments);
+    c.append(card);
+  }
+
+  /* Karte 4: Wöchentlicher Trend */
+  if(trend){
+    const {card,header,body}=sc('Trend (8 Wochen)');
+    addTotal(header,String(trend.total)+' ges.');
+    renderBars(body,trend.bars,{labels:{}});
+    c.append(card);
+  }
+
+  /* Karte 5: Fixed vs Frei */
+  if(fixedfree){
+    const {card,header,body}=sc('Fixed vs Frei');
+    addTotal(header,String(fixedfree.totalFixed+fixedfree.totalFree)+' ges.');
+    renderStacked(body,fixedfree.bars);
+    const meta=el('div','stats-card__meta');meta.textContent='Grün = Fixed · Hell = Frei';
+    card.append(meta);
+    c.append(card);
+  }
+
+  /* Karte 6: Tageszeit */
+  if(timeDist){
+    const {card,header,body}=sc('Tageszeit');
+    addTotal(header,String(timeDist.total)+' ges.');
+    renderBars(body,timeDist.bars,{timeClass:true,labelShort:true});
+    if(timeDist.bestBlock)addMeta(card,'Beste Zeit: '+timeDist.bestBlock);
+    c.append(card);
+  }
 }
 var currentBlockOffset=0;
 var MAX_BLOCK_PAST=10;
@@ -1094,7 +1273,7 @@ async function start(){
     scheduleMidnightRefresh();
     showTutorialIfNeeded();
     const versionEl = document.getElementById('settings-version');
-    if (versionEl) versionEl.textContent = 'v1.6.0';
+    if (versionEl) versionEl.textContent = 'v1.7.0';
   } catch (err) {
     console.error('Initialization error:', err);
     showToast('Fehler beim Laden: ' + (err.message || 'Unbekannter Fehler'));

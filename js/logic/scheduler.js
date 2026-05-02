@@ -156,7 +156,8 @@ class DailyPlanner {
     const plan = await HomeDB.dailyPlans.get(planDate);
     if (!plan) return null;
     const target = (plan.tasks || []).find(t => t.id === taskId) || null;
-    plan.tasks = (plan.tasks || []).map(t => (t.id === taskId ? { ...t, status: 'done' } : t));
+    const now = new Date().toISOString();
+    plan.tasks = (plan.tasks || []).map(t => (t.id === taskId ? { ...t, status: 'done', completedAt: now } : t));
     await HomeDB.dailyPlans.put(plan);
     if (target && target.fixed && target.dueDate && window.HomeRecurrence) {
       const src = await HomeDB.tasks.get(taskId);
@@ -173,7 +174,8 @@ class DailyPlanner {
     const plan = await HomeDB.dailyPlans.get(planDate);
     if (!plan) return null;
     const fixedCompleted = (plan.tasks || []).filter(t => t.fixed && t.dueDate && t.status !== 'done');
-    plan.tasks = (plan.tasks || []).map(t => ({ ...t, status: 'done' }));
+    const now = new Date().toISOString();
+    plan.tasks = (plan.tasks || []).map(t => ({ ...t, status: 'done', completedAt: now }));
     await HomeDB.dailyPlans.put(plan);
     if (fixedCompleted.length && window.HomeRecurrence) {
       for (const t of fixedCompleted) {

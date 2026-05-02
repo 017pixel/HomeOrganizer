@@ -961,20 +961,25 @@ async function renderStats(){
   /* Karte 1: Basis-Stats */
   (()=>{
     const {card,header,body}=sc('Übersicht');
-    addTotal(header,'Heute');
     body.style.display='flex';
-    body.style.gap='var(--space-lg)';
-    body.style.justifyContent='center';
+    body.style.flexDirection='column';
+    body.style.alignItems='center';
+    body.style.gap='var(--space-md)';
+    body.style.padding='var(--space-md) 0';
     body.style.textAlign='center';
-    const cols=[
-      {label:'Heute',value:done+' / '+total,sub:'erledigt'},
-      {label:'Gesamt',value:String(allTimeDone),sub:'erledigt'},
-      {label:'Serie',value:String(streak.count||0)+' Tage',sub:'aktuelle Streak'}
+    const rows=[
+      {label:'Heute erledigt',value:done+' / '+total},
+      {label:'Insgesamt erledigt',value:String(allTimeDone)},
+      {label:'Serie',value:String(streak.count||0)+' Tage'}
     ];
-    for(const col of cols){
+    for(const row of rows){
       const d=el('div','');
-      const v=el('div','');v.style.fontSize='var(--text-xxl,28px)';v.style.fontWeight='var(--font-black)';v.style.fontFamily='var(--font-display)';v.style.color='var(--accent-primary)';v.style.lineHeight='1';v.textContent=col.value;
-      const l=el('div','');l.style.fontSize='var(--text-xs)';l.style.color='var(--text-secondary)';l.textContent=col.sub;
+      d.style.display='flex';
+      d.style.flexDirection='column';
+      d.style.alignItems='center';
+      d.style.gap='4px';
+      const v=el('div','');v.style.fontSize='var(--text-xxl,32px)';v.style.fontWeight='var(--font-black)';v.style.fontFamily='var(--font-display)';v.style.color='var(--accent-primary)';v.style.lineHeight='1.1';v.textContent=row.value;
+      const l=el('div','');l.style.fontSize='var(--text-sm)';l.style.color='var(--text-secondary)';l.textContent=row.label;
       d.append(v,l);
       body.append(d);
     }
@@ -1273,7 +1278,7 @@ async function start(){
     scheduleMidnightRefresh();
     showTutorialIfNeeded();
     const versionEl = document.getElementById('settings-version');
-    if (versionEl) versionEl.textContent = 'v1.7.0';
+    if (versionEl) versionEl.textContent = 'v1.7.1';
   } catch (err) {
     console.error('Initialization error:', err);
     showToast('Fehler beim Laden: ' + (err.message || 'Unbekannter Fehler'));

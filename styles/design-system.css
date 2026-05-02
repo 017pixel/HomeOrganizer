@@ -1164,8 +1164,8 @@ h1,h2,h3{
   border:var(--border-4) solid var(--border-color);
   border-radius:var(--radius-2);
   box-shadow:6px 6px 0 var(--shadow-color);
-  padding:var(--space-lg);
-  margin-bottom:var(--space-lg);
+  padding:var(--space-xl);
+  margin-bottom:var(--space-xl);
 }
 .stats-card__header{
   display:flex;

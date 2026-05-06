@@ -106,21 +106,24 @@ class DailyPlanner {
     if (!plan || !plan.tasks || plan.tasks.length < 3) plan = await this.generateBalancedPlan(key);
 
     if (plan && plan.tasks && window.HomeRecurrence) {
-      const excludeIds = new Set();
-      for (let i = 1; i <= 3; i++) {
-        const prevKey = window.HomeRecurrence.addDaysKey(key, -i);
-        const prevPlan = await HomeDB.dailyPlans.get(prevKey);
-        if (prevPlan && prevPlan.tasks) {
-          prevPlan.tasks.forEach(t => {
-            if (!t.fixed) excludeIds.add(t.id);
-          });
+      const hasCompleted = plan.tasks.some(t => t.status === 'done');
+      if (!hasCompleted) {
+        const excludeIds = new Set();
+        for (let i = 1; i <= 3; i++) {
+          const prevKey = window.HomeRecurrence.addDaysKey(key, -i);
+          const prevPlan = await HomeDB.dailyPlans.get(prevKey);
+          if (prevPlan && prevPlan.tasks) {
+            prevPlan.tasks.forEach(t => {
+              if (!t.fixed) excludeIds.add(t.id);
+            });
+          }
         }
-      }
-      const todayFreeIds = plan.tasks.filter(t => !t.fixed).map(t => t.id);
-      const hasOverlap = todayFreeIds.some(id => excludeIds.has(id));
-      if (hasOverlap && excludeIds.size > 0) {
-        const taskUsageCounts = await this.loadTaskUsageForDays(14);
-        plan = await this.generateBalancedPlan(key, excludeIds, taskUsageCounts);
+        const todayFreeIds = plan.tasks.filter(t => !t.fixed).map(t => t.id);
+        const hasOverlap = todayFreeIds.some(id => excludeIds.has(id));
+        if (hasOverlap && excludeIds.size > 0) {
+          const taskUsageCounts = await this.loadTaskUsageForDays(14);
+          plan = await this.generateBalancedPlan(key, excludeIds, taskUsageCounts);
+        }
       }
     }
 

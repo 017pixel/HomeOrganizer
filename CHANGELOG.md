@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.8.2] - 2026-05-06
+
+### Behoben
+- Tagesplan wurde bei JEDEM Reload neu generiert – jetzt bleibt stabil
+- Erledigte Aufgaben verschwinden nicht mehr nach Reload
+- Erledigte Aufgaben rutschen jetzt ans Ende des Kartenstapels
+- Migration löscht den heutigen Plan und generiert ihn sauber neu
+
+---
+
 ## [1.8.1] - 2026-05-06
 
 ### Behoben

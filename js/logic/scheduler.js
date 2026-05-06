@@ -105,28 +105,6 @@ class DailyPlanner {
     let plan = await HomeDB.dailyPlans.get(key);
     if (!plan || !plan.tasks || plan.tasks.length < 3) plan = await this.generateBalancedPlan(key);
 
-    if (plan && plan.tasks && window.HomeRecurrence) {
-      const hasCompleted = plan.tasks.some(t => t.status === 'done');
-      if (!hasCompleted) {
-        const excludeIds = new Set();
-        for (let i = 1; i <= 3; i++) {
-          const prevKey = window.HomeRecurrence.addDaysKey(key, -i);
-          const prevPlan = await HomeDB.dailyPlans.get(prevKey);
-          if (prevPlan && prevPlan.tasks) {
-            prevPlan.tasks.forEach(t => {
-              if (!t.fixed) excludeIds.add(t.id);
-            });
-          }
-        }
-        const todayFreeIds = plan.tasks.filter(t => !t.fixed).map(t => t.id);
-        const hasOverlap = todayFreeIds.some(id => excludeIds.has(id));
-        if (hasOverlap && excludeIds.size > 0) {
-          const taskUsageCounts = await this.loadTaskUsageForDays(14);
-          plan = await this.generateBalancedPlan(key, excludeIds, taskUsageCounts);
-        }
-      }
-    }
-
     if (plan.date !== key) plan.date = key;
     if (typeof plan.swapsRemaining !== 'number') plan.swapsRemaining = 3;
     if (!plan.difficulty) plan.difficulty = 'balanced';
@@ -177,7 +155,9 @@ class DailyPlanner {
     if (!plan) return null;
     const target = (plan.tasks || []).find(t => t.id === taskId) || null;
     const now = new Date().toISOString();
-    plan.tasks = (plan.tasks || []).map(t => (t.id === taskId ? { ...t, status: 'done', completedAt: now } : t));
+    const completed = { ...(target || { id: taskId }), status: 'done', completedAt: now };
+    const remaining = (plan.tasks || []).filter(t => t.id !== taskId);
+    plan.tasks = [...remaining, completed];
     await HomeDB.dailyPlans.put(plan);
     if (target && target.fixed && target.dueDate && window.HomeRecurrence) {
       const src = await HomeDB.tasks.get(taskId);

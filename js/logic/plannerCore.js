@@ -7,10 +7,6 @@
   function assert(condition, message) {
     if (!condition) throw new Error(message);
   }
-  function pickRandom(arr, rng) {
-    if (!arr.length) return null;
-    return arr[Math.floor(rng() * arr.length)];
-  }
   function getDifficulty(duration) {
     if (duration <= 20) return 'easy';
     if (duration <= 45) return 'medium';
@@ -49,7 +45,7 @@
     if (a === b) return 0;
     return a < b ? -1 : 1;
   }
-  function buildPlanTasks({ dateKey, tasks, minutes, maxTasks = 3, rng = Math.random, excludeTaskIds = new Set() }) {
+  function buildPlanTasks({ dateKey, tasks, minutes, maxTasks = 3, rng = Math.random, excludeTaskIds = new Set(), taskUsageCounts = {} }) {
     assert(typeof dateKey === 'string' && dateKey.length === 10, 'Ungültiges Datum');
     const list = Array.isArray(tasks) ? tasks.slice() : [];
     const normalized = list.map((t) => (R ? R.ensureTaskNextDue(t, dateKey) : { ...t }));
@@ -73,32 +69,14 @@
     if (!freeTasks.length) return { tasks: fixedPicked, targetDifficulty: 'fixed+empty' };
     let availableFree = freeTasks.filter(t => !excludeTaskIds.has(t.id));
     if (availableFree.length < slots) availableFree = freeTasks;
-    const easyTasks = availableFree.filter((t) => t.duration <= 20);
-    const mediumTasks = availableFree.filter((t) => t.duration > 20 && t.duration < 45);
-    const hardTasks = availableFree.filter((t) => t.duration >= 45);
-    let target = 'balanced';
-    let picked = [];
-    if (minutes <= 45) {
-      target = 'easy';
-      picked = Array.from({ length: slots }, () => pickRandom(easyTasks.length ? easyTasks : availableFree, rng));
-    } else if (minutes <= 60) {
-      target = 'mixed';
-      picked = [pickRandom(easyTasks.length ? easyTasks : availableFree, rng), pickRandom(easyTasks.length ? easyTasks : availableFree, rng), pickRandom(mediumTasks.length ? mediumTasks : availableFree, rng)].slice(0, slots);
-    } else {
-      target = 'balanced';
-      picked = [pickRandom(easyTasks.length ? easyTasks : availableFree, rng), pickRandom(easyTasks.length ? easyTasks : availableFree, rng), pickRandom(hardTasks.length ? hardTasks : availableFree, rng)].slice(0, slots);
-    }
-    const selected = [];
-    for (const p of picked) {
-      if (p && !selected.find((x) => x.id === p.id) && !fixedIds.has(p.id)) selected.push(p);
-    }
-    while (selected.length < slots) {
-      const r = pickRandom(availableFree, rng);
-      if (!r) break;
-      if (!selected.find((x) => x.id === r.id)) selected.push(r);
-      if (selected.length >= availableFree.length) break;
-    }
-    return { tasks: fixedPicked.concat(selected.slice(0, slots).map(toPlanTask)), targetDifficulty: target };
+    const sorted = [...availableFree].sort((a, b) => {
+      const aUsage = taskUsageCounts[a.id] || 0;
+      const bUsage = taskUsageCounts[b.id] || 0;
+      if (aUsage !== bUsage) return aUsage - bUsage;
+      return rng() - 0.5;
+    });
+    const selected = sorted.slice(0, slots).map(toPlanTask);
+    return { tasks: fixedPicked.concat(selected), targetDifficulty: 'balanced' };
   }
   return { buildPlanTasks, getDifficulty };
 });

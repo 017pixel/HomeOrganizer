@@ -354,6 +354,19 @@ function initActions(){
       };
     }
   };
+
+  const repairBtn = $('#repair-plan');
+  if (repairBtn) repairBtn.onclick = async () => {
+    if (confirm('Der Plan der nächsten 2 Wochen wird neu generiert. Bestehende Aufgaben, Statistiken und Einstellungen bleiben erhalten.')) {
+      if (window.HomeScheduler && typeof window.HomeScheduler.regenerateFuturePlans === 'function' && window.HomeRecurrence) {
+        const today = todayKey();
+        await window.HomeScheduler.regenerateFuturePlans(today);
+        await renderPlan();
+        await renderWeekOverview(0);
+        showToast('Plan wurde neu generiert!');
+      }
+    }
+  };
 }
 
 function openHelpSheet(){
@@ -1271,6 +1284,12 @@ async function start(){
   try {
     await ensureDefaults();
     await ensureDayRollover();
+    const migratedV4 = await HomeDB.settings.get('migrated_v4');
+    if (!migratedV4 && window.HomeScheduler && typeof window.HomeScheduler.regenerateFuturePlans === 'function' && window.HomeRecurrence) {
+      const today = todayKey();
+      await window.HomeScheduler.regenerateFuturePlans(today);
+      await HomeDB.settings.put({ key: 'migrated_v4', value: true });
+    }
     initTabs();
     initActions();
     await renderTasks();
@@ -1278,7 +1297,7 @@ async function start(){
     scheduleMidnightRefresh();
     showTutorialIfNeeded();
     const versionEl = document.getElementById('settings-version');
-    if (versionEl) versionEl.textContent = 'v1.7.1';
+    if (versionEl) versionEl.textContent = 'v1.8.0';
   } catch (err) {
     console.error('Initialization error:', err);
     showToast('Fehler beim Laden: ' + (err.message || 'Unbekannter Fehler'));

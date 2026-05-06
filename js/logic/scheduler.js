@@ -14,10 +14,6 @@ async function getAvailableMinutes(dateKey) {
   if (s && s[w]) return s[w];
   return 60;
 }
-function pickRandom(arr) {
-  if (!arr.length) return null;
-  return arr[Math.floor(Math.random()*arr.length)];
-}
 function getDifficulty(duration) {
   if (duration <= 20) return 'easy';
   if (duration <= 45) return 'medium';
@@ -36,7 +32,7 @@ function toPlanTask(task) {
 }
 
 class DailyPlanner {
-  async generateBalancedPlan(dateKey = todayKey(), excludeTaskIds = new Set()) {
+  async generateBalancedPlan(dateKey = todayKey(), excludeTaskIds = new Set(), taskUsageCounts = {}) {
     const tasks = await HomeDB.tasks.list();
     const minutes = await getAvailableMinutes(dateKey);
 
@@ -71,7 +67,7 @@ class DailyPlanner {
 
     let result = null;
     if (window.HomePlannerCore && typeof window.HomePlannerCore.buildPlanTasks === 'function') {
-      result = window.HomePlannerCore.buildPlanTasks({ dateKey, tasks: normalized, minutes, maxTasks: 3, excludeTaskIds });
+      result = window.HomePlannerCore.buildPlanTasks({ dateKey, tasks: normalized, minutes, maxTasks: 3, excludeTaskIds, taskUsageCounts });
     }
 
     const plan = {
@@ -86,26 +82,45 @@ class DailyPlanner {
     return plan;
   }
 
+  async loadTaskUsageForDays(days = 14) {
+    const counts = {};
+    if (!window.HomeRecurrence) return counts;
+    const today = todayKey();
+    for (let i = 0; i < days; i++) {
+      const dateKey = window.HomeRecurrence.addDaysKey(today, i);
+      const plan = await HomeDB.dailyPlans.get(dateKey);
+      if (plan && plan.tasks) {
+        for (const t of plan.tasks) {
+          if (!t.fixed) {
+            counts[t.id] = (counts[t.id] || 0) + 1;
+          }
+        }
+      }
+    }
+    return counts;
+  }
+
   async getOrFixTodayPlan() {
     const key = todayKey();
     let plan = await HomeDB.dailyPlans.get(key);
     if (!plan || !plan.tasks || plan.tasks.length < 3) plan = await this.generateBalancedPlan(key);
 
     if (plan && plan.tasks && window.HomeRecurrence) {
-      const hasCompleted = plan.tasks.some(t => t.status === 'done');
-      if (!hasCompleted) {
-        const yesterdayKey = window.HomeRecurrence.addDaysKey(key, -1);
-        const yesterdayPlan = await HomeDB.dailyPlans.get(yesterdayKey);
-        if (yesterdayPlan && yesterdayPlan.tasks) {
-          const yesterdayFreeIds = new Set(yesterdayPlan.tasks.filter(t => !t.fixed).map(t => t.id));
-          const todayFreeTasks = plan.tasks.filter(t => !t.fixed);
-          const hasOverlap = todayFreeTasks.some(t => yesterdayFreeIds.has(t.id));
-          if (hasOverlap) {
-            const excludeIds = new Set();
-            yesterdayPlan.tasks.forEach(t => excludeIds.add(t.id));
-            plan = await this.generateBalancedPlan(key, excludeIds);
-          }
+      const excludeIds = new Set();
+      for (let i = 1; i <= 3; i++) {
+        const prevKey = window.HomeRecurrence.addDaysKey(key, -i);
+        const prevPlan = await HomeDB.dailyPlans.get(prevKey);
+        if (prevPlan && prevPlan.tasks) {
+          prevPlan.tasks.forEach(t => {
+            if (!t.fixed) excludeIds.add(t.id);
+          });
         }
+      }
+      const todayFreeIds = plan.tasks.filter(t => !t.fixed).map(t => t.id);
+      const hasOverlap = todayFreeIds.some(id => excludeIds.has(id));
+      if (hasOverlap && excludeIds.size > 0) {
+        const taskUsageCounts = await this.loadTaskUsageForDays(14);
+        plan = await this.generateBalancedPlan(key, excludeIds, taskUsageCounts);
       }
     }
 
@@ -135,7 +150,9 @@ class DailyPlanner {
     const existing = new Set(plan.tasks.map(t => t.id));
     const freeOnly = allTasks.filter(t => !t.repeat || !t.repeat.kind || t.repeat.kind === 'none');
     const candidates = freeOnly.filter(t => !existing.has(t.id));
-    const next = pickRandom(candidates.length ? candidates : freeOnly.filter(t => t.id !== oldTaskId));
+    const pool = candidates.length ? candidates : freeOnly.filter(t => t.id !== oldTaskId);
+    const shuffled = [...pool].sort(() => Math.random() - 0.5);
+    const next = shuffled[0] || null;
     if (!next) throw new Error('Keine Ersatzaufgabe verfügbar');
 
     const timestamp = new Date().toISOString();
@@ -198,19 +215,34 @@ class DailyPlanner {
   async ensurePlansForDays(days = 14) {
     const today = todayKey();
     if (!window.HomeRecurrence) return;
+    const allFreeTasks = (await HomeDB.tasks.list()).filter(t => !t.repeat || !t.repeat.kind || t.repeat.kind === 'none');
+    const taskUsageCounts = {};
     for (let i = 0; i < days; i++) {
       const dateKey = window.HomeRecurrence.addDaysKey(today, i);
       let plan = await HomeDB.dailyPlans.get(dateKey);
       if (!plan || !plan.tasks || plan.tasks.length < 3) {
-        const excludeTaskIds = new Set();
-        for (let j = Math.max(0, i - 3); j < i; j++) {
-          const prevDate = window.HomeRecurrence.addDaysKey(today, j);
-          const prevPlan = await HomeDB.dailyPlans.get(prevDate);
-          if (prevPlan && prevPlan.tasks) {
-            prevPlan.tasks.forEach(t => excludeTaskIds.add(t.id));
+        let excludeTaskIds = new Set();
+        for (let lookback = 3; lookback >= 0; lookback--) {
+          excludeTaskIds = new Set();
+          for (let j = Math.max(0, i - lookback); j < i; j++) {
+            const prevDate = window.HomeRecurrence.addDaysKey(today, j);
+            const prevPlan = await HomeDB.dailyPlans.get(prevDate);
+            if (prevPlan && prevPlan.tasks) {
+              prevPlan.tasks.forEach(t => {
+                if (!t.fixed) excludeTaskIds.add(t.id);
+              });
+            }
+          }
+          if (lookback === 0 || allFreeTasks.length - excludeTaskIds.size >= 3) break;
+        }
+        plan = await this.generateBalancedPlan(dateKey, excludeTaskIds, taskUsageCounts);
+      }
+      if (plan && plan.tasks) {
+        for (const t of plan.tasks) {
+          if (!t.fixed) {
+            taskUsageCounts[t.id] = (taskUsageCounts[t.id] || 0) + 1;
           }
         }
-        await this.generateBalancedPlan(dateKey, excludeTaskIds);
       }
     }
   }

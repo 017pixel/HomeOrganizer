@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.8.0] - 2026-05-06
+
+### Erstellt
+- Reparatur Button in den Einstellungen hinzugefügt
+- Automatische Migration für Bestandsnutzer beim ersten Start
+- Nutzungszähler für gleichmäßige Aufgabenverteilung über 14 Tage
+- Intelligente Überlappungsprüfung über die letzten 3 Tage
+- Progressive Lookback-Reduzierung bei zu wenigen verfügbaren Aufgaben
+
+### Behoben
+- Aufgaben wiederholten sich ständig – jetzt gleichmäßige Verteilung über alle Tage
+- Erledigte Aufgaben tauchten am nächsten Tag wieder auf
+- Algorithmus wählte immer dieselben 3 aus 5 Standardaufgaben
+- Swap-Funktion wählte zufällig ohne Verteilungslogik
+- Ausschlusslogik blockierte zu viele Aufgaben bei kleinem Aufgabenpool
+
+### Verändert
+- Aufgabenauswahl sortiert nach Nutzungshäufigkeit statt Zufall mit Zurücklegen
+- Überlappungsprüfung läuft immer, nicht nur bei unerledigten Aufgaben
+- Algorithmus auf v1.8.0 aktualisiert
+
+### Gelöscht
+- Nicht mehr benötigte pickRandom-Hilfsfunktionen entfernt
+
+---
+
 ## [1.7.0] - 2026-05-02
 
 ### Erstellt

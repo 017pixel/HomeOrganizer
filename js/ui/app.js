@@ -1286,8 +1286,8 @@ async function start(){
     await ensureDayRollover();
     const migratedV4 = await HomeDB.settings.get('migrated_v4');
     if (!migratedV4 && window.HomeScheduler && typeof window.HomeScheduler.regenerateFuturePlans === 'function' && window.HomeRecurrence) {
-      const today = todayKey();
-      await window.HomeScheduler.regenerateFuturePlans(today);
+      const tomorrow = window.HomeRecurrence.addDaysKey(todayKey(), 1);
+      await window.HomeScheduler.regenerateFuturePlans(tomorrow);
       await HomeDB.settings.put({ key: 'migrated_v4', value: true });
     }
     initTabs();

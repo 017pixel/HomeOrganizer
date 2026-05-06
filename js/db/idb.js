@@ -74,6 +74,7 @@ const db = {
   dailyPlans: {
     put(v) { return put('dailyPlans', v); },
     get(date) { return get('dailyPlans', date); },
+    del(date) { return del('dailyPlans', date); },
     list() { return list('dailyPlans'); },
     clear() { return clearStore('dailyPlans'); }
   },

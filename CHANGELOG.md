@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.1] - 2026-05-06
+
+### Behoben
+- Fehlende `dailyPlans.del` Methode in der IndexedDB-Schicht – verhinderte Migration und Reparatur Button
+- Migration löscht heute nicht mehr – erledigte Aufgaben bleiben erhalten
+
+---
+
 ## [1.8.0] - 2026-05-06
 
 ### Erstellt

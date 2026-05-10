@@ -64,5 +64,93 @@ describe('HomeRecurrence', () => {
       })
     ).toThrow();
   });
+
+  it('ensureTaskNextDue springt bei vergangener storedNextDue weiter (wöchentlich)', () => {
+    const task = {
+      id: 1,
+      repeat: { kind: 'weekly', startDate: '2026-05-04', daysOfWeek: [2], intervalWeeks: 1 },
+      nextDue: '2026-05-06',
+      lastCompletedDue: null
+    };
+    const result = Recurrence.ensureTaskNextDue(task, '2026-05-13');
+    expect(result.nextDue).toBe('2026-05-13');
+  });
+
+  it('ensureTaskNextDue springt bei mehrmals-pro-Woche zum nächsten Tag', () => {
+    const task = {
+      id: 2,
+      repeat: { kind: 'weekly', startDate: '2026-05-04', daysOfWeek: [0, 1, 4], intervalWeeks: 1 },
+      nextDue: '2026-05-11',
+      lastCompletedDue: null
+    };
+    const result = Recurrence.ensureTaskNextDue(task, '2026-05-12');
+    expect(result.nextDue).toBe('2026-05-12');
+  });
+
+  it('ensureTaskNextDue behält zukünftige storedNextDue', () => {
+    const task = {
+      id: 3,
+      repeat: { kind: 'monthly', startDate: '2026-01-01', dayOfMonth: 15, intervalMonths: 1 },
+      nextDue: '2026-05-15',
+      lastCompletedDue: null
+    };
+    const result = Recurrence.ensureTaskNextDue(task, '2026-05-10');
+    expect(result.nextDue).toBe('2026-05-15');
+  });
+
+  it('ensureTaskNextDue mit lastCompletedDue (completed task)', () => {
+    const task = {
+      id: 4,
+      repeat: { kind: 'weekly', startDate: '2026-05-04', daysOfWeek: [2], intervalWeeks: 1 },
+      nextDue: '2026-05-20',
+      lastCompletedDue: '2026-05-13'
+    };
+    const result = Recurrence.ensureTaskNextDue(task, '2026-05-20');
+    expect(result.nextDue).toBe('2026-05-20');
+  });
+
+  it('ensureTaskNextDue mit biweekly und vergangener storedNextDue', () => {
+    const task = {
+      id: 5,
+      repeat: { kind: 'weekly', startDate: '2026-05-04', daysOfWeek: [0], intervalWeeks: 2 },
+      nextDue: '2026-05-04',
+      lastCompletedDue: null
+    };
+    const result = Recurrence.ensureTaskNextDue(task, '2026-05-11');
+    expect(result.nextDue).toBe('2026-05-18');
+  });
+
+  it('ensureTaskNextDue mit custom-intervall (alle 3 Tage) und vergangener storedNextDue', () => {
+    const task = {
+      id: 6,
+      repeat: { kind: 'custom', unit: 'day', every: 3, startDate: '2026-05-01' },
+      nextDue: '2026-05-07',
+      lastCompletedDue: null
+    };
+    const result = Recurrence.ensureTaskNextDue(task, '2026-05-10');
+    expect(result.nextDue).toBe('2026-05-10');
+  });
+
+  it('ensureTaskNextDue mit keiner storedNextDue berechnet von today', () => {
+    const task = {
+      id: 7,
+      repeat: { kind: 'weekly', startDate: '2026-05-04', daysOfWeek: [2], intervalWeeks: 1 },
+      nextDue: null,
+      lastCompletedDue: null
+    };
+    const result = Recurrence.ensureTaskNextDue(task, '2026-05-12');
+    expect(result.nextDue).toBe('2026-05-13');
+  });
+
+  it('ensureTaskNextDue mit none-repeat gibt nextDue null', () => {
+    const task = {
+      id: 8,
+      repeat: { kind: 'none' },
+      nextDue: '2026-05-13',
+      lastCompletedDue: null
+    };
+    const result = Recurrence.ensureTaskNextDue(task, '2026-05-12');
+    expect(result.nextDue).toBeNull();
+  });
 });
 

@@ -50,16 +50,22 @@
     const list = Array.isArray(tasks) ? tasks.slice() : [];
     const normalized = list.map((t) => (R ? R.ensureTaskNextDue(t, dateKey) : { ...t }));
     const fixedCandidates = normalized
-      .filter((t) => isFixed(t) && t.nextDue && compareDateKeys(t.nextDue, dateKey) <= 0)
+      .filter((t) => isFixed(t) && compareDateKeys(t.nextDue, dateKey) === 0)
       .sort((a, b) => {
         const d = compareDateKeys(a.nextDue, b.nextDue);
         if (d !== 0) return d;
         return (a.id ?? 0) - (b.id ?? 0);
       });
     const dailyFixed = fixedCandidates.filter(t => isDailyRepeat(t));
-    const otherFixed = fixedCandidates.filter(t => !isDailyRepeat(t));
+    let otherFixed = fixedCandidates.filter(t => !isDailyRepeat(t));
     const dailyPicked = dailyFixed.slice(0, 1).map(toFixedPlanTask);
     const maxOther = maxTasks - dailyPicked.length;
+    if (otherFixed.length > maxOther) {
+      for (let i = otherFixed.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        [otherFixed[i], otherFixed[j]] = [otherFixed[j], otherFixed[i]];
+      }
+    }
     const otherPicked = otherFixed.slice(0, maxOther).map(toFixedPlanTask);
     const fixedPicked = [...dailyPicked, ...otherPicked].slice(0, maxTasks);
     const fixedIds = new Set(fixedPicked.map((t) => t.id));

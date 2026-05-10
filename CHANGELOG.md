@@ -1,12 +1,13 @@
 # Changelog
 
-## [1.8.2] - 2026-05-06
+## [1.8.4] - 2026-05-10
 
 ### Behoben
-- Tagesplan wurde bei JEDEM Reload neu generiert – jetzt bleibt stabil
-- Erledigte Aufgaben verschwinden nicht mehr nach Reload
-- Erledigte Aufgaben rutschen jetzt ans Ende des Kartenstapels
-- Migration löscht den heutigen Plan und generiert ihn sauber neu
+- Wiederkehrende Aufgaben erschienen nur am ersten Termin, nie danach – jetzt korrekt
+- Mehrmals-pro-Woche-Aufgaben zeigten nur den ersten Tag an, restliche Tage fehlten
+- Bei mehreren festen Aufgaben am gleichen Tag wurden immer dieselben ausgewählt – jetzt zufällig
+- Reparatur-Button korrigiert jetzt alle Tasks (auch monatliche/jährliche >14 Tage entfernt)
+- Korrupter heutiger Plan wird vom Reparatur-Button ebenfalls neu generiert
 
 ---
 

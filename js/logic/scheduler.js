@@ -230,14 +230,24 @@ class DailyPlanner {
     }
   }
 
-  async regenerateFuturePlans(fromDateKey) {
+  async regenerateFuturePlans(fromDateKey, days = 14) {
     const plans = await HomeDB.dailyPlans.list();
+    if (window.HomeRecurrence) {
+      const tasks = await HomeDB.tasks.list();
+      const today = todayKey();
+      for (const task of tasks) {
+        const normalized = window.HomeRecurrence.ensureTaskNextDue(task, today);
+        if ((task.nextDue || null) !== (normalized.nextDue || null) || JSON.stringify(task.repeat || null) !== JSON.stringify(normalized.repeat || null) || (task.repeatError || null) !== (normalized.repeatError || null)) {
+          await HomeDB.tasks.put(normalized);
+        }
+      }
+    }
     for (const plan of plans) {
       if (plan.date >= fromDateKey) {
         await HomeDB.dailyPlans.del(plan.date);
       }
     }
-    await this.ensurePlansForDays(14);
+    await this.ensurePlansForDays(days);
   }
 }
 
@@ -251,5 +261,5 @@ window.HomeScheduler = {
   completePlan: (date) => planner.completePlan(date),
   getNextIndex: (idx, total, dir) => planner.getNextCardIndex(idx, total, dir),
   ensurePlansForDays: (days) => planner.ensurePlansForDays(days),
-  regenerateFuturePlans: (fromDateKey) => planner.regenerateFuturePlans(fromDateKey)
+  regenerateFuturePlans: (fromDateKey, days) => planner.regenerateFuturePlans(fromDateKey, days)
 };

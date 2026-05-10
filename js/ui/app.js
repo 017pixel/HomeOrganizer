@@ -357,13 +357,33 @@ function initActions(){
 
   const repairBtn = $('#repair-plan');
   if (repairBtn) repairBtn.onclick = async () => {
-    if (confirm('Der Plan der nächsten 2 Wochen wird neu generiert. Bestehende Aufgaben, Statistiken und Einstellungen bleiben erhalten.')) {
+    if (confirm('Alle Aufgaben werden normalisiert und alle Pläne ab heute neu generiert. Bereits erledigte Aufgaben heute bleiben erhalten.')) {
       if (window.HomeScheduler && typeof window.HomeScheduler.regenerateFuturePlans === 'function' && window.HomeRecurrence) {
+        let fixedCount = 0;
+        const tasks = await HomeDB.tasks.list();
         const today = todayKey();
-        await window.HomeScheduler.regenerateFuturePlans(today);
+        for (const task of tasks) {
+          const beforeNextDue = task.nextDue || null;
+          const beforeError = task.repeatError || null;
+          const normalized = window.HomeRecurrence.ensureTaskNextDue(task, today);
+          if ((beforeNextDue !== (normalized.nextDue || null)) || (beforeError !== (normalized.repeatError || null)) || JSON.stringify(task.repeat || null) !== JSON.stringify(normalized.repeat || null)) {
+            await HomeDB.tasks.put(normalized);
+            fixedCount++;
+          }
+        }
+
+        const todayPlan = await HomeDB.dailyPlans.get(today);
+        if (!todayPlan || !todayPlan.tasks || todayPlan.tasks.length < 3 || todayPlan.tasks.some(t => !t.title || typeof t.duration !== 'number')) {
+          await HomeDB.dailyPlans.del(today);
+        }
+
+        const tomorrow = window.HomeRecurrence.addDaysKey(today, 1);
+        await window.HomeScheduler.regenerateFuturePlans(tomorrow, 35);
+
         await renderPlan();
         await renderWeekOverview(0);
-        showToast('Plan wurde neu generiert!');
+        const msg = fixedCount > 0 ? `Plan neu generiert (${fixedCount} Aufgabe(n) korrigiert)` : 'Plan wurde neu generiert!';
+        showToast(msg);
       }
     }
   };
@@ -1284,11 +1304,14 @@ async function start(){
   try {
     await ensureDefaults();
     await ensureDayRollover();
-    const migratedPlanAlgoV2 = await HomeDB.settings.get('migrated_plan_algo_v2');
-    if (!migratedPlanAlgoV2 && window.HomeScheduler && typeof window.HomeScheduler.regenerateFuturePlans === 'function' && window.HomeRecurrence) {
-      const today = todayKey();
-      await window.HomeScheduler.regenerateFuturePlans(today);
-      await HomeDB.settings.put({ key: 'migrated_plan_algo_v2', value: true });
+    const currentVersion = window.APP_VERSION;
+    const lastVersionEntry = await HomeDB.settings.get('lastAppVersion');
+    const lastVersion = lastVersionEntry && lastVersionEntry.value ? lastVersionEntry.value : null;
+    if ((!lastVersion || lastVersion !== currentVersion) && window.HomeScheduler && typeof window.HomeScheduler.regenerateFuturePlans === 'function' && window.HomeRecurrence) {
+      const tomorrow = window.HomeRecurrence.addDaysKey(todayKey(), 1);
+      await window.HomeScheduler.regenerateFuturePlans(tomorrow);
+      await HomeDB.settings.put({ key: 'lastAppVersion', value: currentVersion });
+      try { await HomeDB.settings.del('migrated_plan_algo_v2'); } catch (e) { /* noop */ }
     }
     initTabs();
     initActions();
@@ -1297,7 +1320,7 @@ async function start(){
     scheduleMidnightRefresh();
     showTutorialIfNeeded();
     const versionEl = document.getElementById('settings-version');
-    if (versionEl) versionEl.textContent = 'v1.8.2';
+    if (versionEl) versionEl.textContent = 'v' + (window.APP_VERSION || 'unknown');
   } catch (err) {
     console.error('Initialization error:', err);
     showToast('Fehler beim Laden: ' + (err.message || 'Unbekannter Fehler'));

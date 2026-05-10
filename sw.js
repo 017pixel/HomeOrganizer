@@ -1,4 +1,4 @@
-const CACHE_NAME = 'homeorganizer-v10';
+const CACHE_NAME = 'homeorganizer-v12'; // MUST be bumped on every release to bust old caches
 const PRECACHE = [
   './',
   './index.html',

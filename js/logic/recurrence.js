@@ -174,7 +174,18 @@
     if (repeat.kind === 'none') return { ...task, repeat, nextDue: null };
     const lastCompletedDue = isDateKey(task.lastCompletedDue) ? task.lastCompletedDue : null;
     const storedNextDue = isDateKey(task.nextDue) ? task.nextDue : null;
-    const computed = lastCompletedDue ? nextDueAfter(lastCompletedDue, repeat) : (storedNextDue || nextDueOnOrAfter(todayKey, repeat));
+    let computed;
+    if (lastCompletedDue) {
+      computed = nextDueAfter(lastCompletedDue, repeat);
+    } else if (storedNextDue) {
+      if (compareDateKeys(storedNextDue, todayKey) < 0) {
+        computed = nextDueOnOrAfter(todayKey, repeat);
+      } else {
+        computed = storedNextDue;
+      }
+    } else {
+      computed = nextDueOnOrAfter(todayKey, repeat);
+    }
     return { ...task, repeat, nextDue: computed };
   }
   return {

@@ -1,5 +1,6 @@
 {
   "name": "cleanhome-pwa",
+  "version": "1.8.4",
   "private": true,
   "scripts": {
     "dev": "http-server . -p 1233 -c-1",

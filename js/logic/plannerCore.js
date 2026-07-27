@@ -48,7 +48,7 @@
   function buildPlanTasks({ dateKey, tasks, minutes, maxTasks = 3, rng = Math.random, excludeTaskIds = new Set(), taskUsageCounts = {} }) {
     assert(typeof dateKey === 'string' && dateKey.length === 10, 'Ungültiges Datum');
     const list = Array.isArray(tasks) ? tasks.slice() : [];
-    const normalized = list.map((t) => (R ? R.ensureTaskNextDue(t, dateKey) : { ...t }));
+    const normalized = list.map((t) => (R ? R.ensureTaskNextDue(t, dateKey) : { ...t, nextDue: null }));
     const fixedCandidates = normalized
       .filter((t) => isFixed(t) && compareDateKeys(t.nextDue, dateKey) === 0)
       .sort((a, b) => {

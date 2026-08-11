@@ -1,6 +1,8 @@
 name: Snapshot-Generator
 on:
-  workflow_dispatch:
+  push:
+    branches: ["modernisierung"]
+    paths: ["tests/__screenshots__/**", ".github/workflows/snapshot-gen.yml"]
 
 jobs:
   generate:

@@ -451,7 +451,7 @@ h1,h2,h3{
 
 .haptic-zone{
   position:absolute;
-  inset:-18px;
+  inset:0;
   border-radius:var(--radius-2);
   pointer-events:none;
   opacity:0;

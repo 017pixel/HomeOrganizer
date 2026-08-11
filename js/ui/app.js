@@ -1229,6 +1229,7 @@ function initWeekSwipe(gridEl){
   });
 }
 async function start(){
+  window.__appReady = false;
   try {
     initTabs();
     initActions();
@@ -1250,8 +1251,10 @@ async function start(){
     showTutorialIfNeeded();
     const versionEl = document.getElementById('settings-version');
     if (versionEl) versionEl.textContent = 'v' + (window.APP_VERSION || 'unknown');
+    window.__appReady = true;
   } catch (err) {
     console.error('Initialization error:', err);
+    window.__appReady = true;
     showToast('Fehler beim Laden: ' + (err.message || 'Unbekannter Fehler'));
     // Fallback: try to show the plan at least
     const container = document.getElementById('cards-container');

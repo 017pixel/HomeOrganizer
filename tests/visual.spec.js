@@ -28,6 +28,10 @@ async function stabilizeRuntime(page) {
   });
 }
 
+async function waitAppReady(page) {
+  await page.waitForFunction(() => window.__appReady === true, null, { timeout: 15000 });
+}
+
 async function blurActiveElement(page) {
   await page.mouse.move(0, 0);
   await page.evaluate(() => {
@@ -43,6 +47,7 @@ test.beforeEach(async ({ page }) => {
 
 test('Plan (Dark)', async ({ page }) => {
   await page.goto('/');
+  await waitAppReady(page);
   await blurActiveElement(page);
   await expect(page).toHaveScreenshot('plan-dark.png', { fullPage: true });
 });
@@ -53,6 +58,7 @@ test('Onboarding Tutorial Flow', async ({ page }) => {
     localStorage.setItem('gestureHelpDismissed', '1');
   });
   await page.goto('/');
+  await waitAppReady(page);
   await expect(page.locator('#tutorial')).toBeVisible();
   await page.click('#tutorial-next');
   await page.waitForFunction(() => document.getElementById('tutorial-slides')?.style.transform.includes('-100%'));
@@ -64,6 +70,7 @@ test('Onboarding Tutorial Flow', async ({ page }) => {
 
 test('Aufgaben (Dark)', async ({ page }) => {
   await page.goto('/');
+  await waitAppReady(page);
   await page.click('.tab[data-tab="tasks"]');
   await blurActiveElement(page);
   await expect(page).toHaveScreenshot('tasks-dark.png', { fullPage: true });
@@ -71,6 +78,7 @@ test('Aufgaben (Dark)', async ({ page }) => {
 
 test('Einstellungen (Dark)', async ({ page }) => {
   await page.goto('/');
+  await waitAppReady(page);
   await page.click('.tab[data-tab="settings"]');
   await blurActiveElement(page);
   await expect(page).toHaveScreenshot('settings-dark.png', { fullPage: true });
@@ -78,6 +86,7 @@ test('Einstellungen (Dark)', async ({ page }) => {
 
 test('Task-Modal', async ({ page }) => {
   await page.goto('/');
+  await waitAppReady(page);
   await page.click('.tab[data-tab="tasks"]');
   await page.click('#add-task');
   await expect(page.locator('#task-modal')).toBeVisible();
@@ -88,6 +97,7 @@ test('Task-Modal', async ({ page }) => {
 
 test('Wochenuebersicht (Dark)', async ({ page }) => {
   await page.goto('/');
+  await waitAppReady(page);
   await page.click('.tab[data-tab="week"]');
   await blurActiveElement(page);
   await expect(page).toHaveScreenshot('week-dark.png', { fullPage: true });
@@ -95,6 +105,7 @@ test('Wochenuebersicht (Dark)', async ({ page }) => {
 
 test('Light Mode', async ({ page }) => {
   await page.goto('/');
+  await waitAppReady(page);
   await page.click('.tab[data-tab="settings"]');
   await page.click('label[for="theme-toggle"]');
   await page.waitForFunction(() => document.documentElement.getAttribute('data-theme') === 'light');

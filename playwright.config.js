@@ -6,6 +6,7 @@ module.exports = defineConfig({
   fullyParallel: true,
   retries: process.env.CI ? 2 : 0,
   use: {
+    channel: 'chromium',
     baseURL: 'http://127.0.0.1:4174',
     viewport: { width: 390, height: 844 },
     deviceScaleFactor: 2,

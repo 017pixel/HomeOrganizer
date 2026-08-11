@@ -152,5 +152,54 @@ describe('HomeRecurrence', () => {
     const result = Recurrence.ensureTaskNextDue(task, '2026-05-12');
     expect(result.nextDue).toBeNull();
   });
+
+  it('custom wochen-intervall wird zu weekly mit intervalWeeks', () => {
+    const r = Recurrence.normalizeRepeatConfig({
+      kind: 'custom',
+      unit: 'week',
+      every: 2,
+      startDate: '2026-02-02',
+      daysOfWeek: [0]
+    });
+    expect(r.kind).toBe('weekly');
+    expect(r.intervalWeeks).toBe(2);
+    expect(Recurrence.nextDueOnOrAfter('2026-02-02', r)).toBe('2026-02-02');
+    expect(Recurrence.nextDueOnOrAfter('2026-02-09', r)).toBe('2026-02-16');
+  });
+
+  it('custom monats-intervall wird zu monthly mit intervalMonths', () => {
+    const r = Recurrence.normalizeRepeatConfig({
+      kind: 'custom',
+      unit: 'month',
+      every: 3,
+      startDate: '2026-01-20',
+      dayOfMonth: 20
+    });
+    expect(r.kind).toBe('monthly');
+    expect(r.intervalMonths).toBe(3);
+    expect(Recurrence.nextDueOnOrAfter('2026-02-20', r)).toBe('2026-04-20');
+  });
+
+  it('monatliche Wiederholung läuft über Jahreswechsel', () => {
+    const r = Recurrence.normalizeRepeatConfig({
+      kind: 'monthly',
+      startDate: '2026-11-15',
+      dayOfMonth: 15,
+      intervalMonths: 1
+    });
+    expect(Recurrence.nextDueAfter('2026-12-15', r)).toBe('2027-01-15');
+  });
+
+  it('weekly mit biweekly startet in der korrekten Kalenderwoche', () => {
+    const r = Recurrence.normalizeRepeatConfig({
+      kind: 'weekly',
+      startDate: '2026-02-09',
+      daysOfWeek: [1],
+      intervalWeeks: 2
+    });
+    expect(Recurrence.nextDueOnOrAfter('2026-02-10', r)).toBe('2026-02-10');
+    expect(Recurrence.nextDueOnOrAfter('2026-02-11', r)).toBe('2026-02-24');
+    expect(Recurrence.nextDueOnOrAfter('2026-02-24', r)).toBe('2026-02-24');
+  });
 });
 

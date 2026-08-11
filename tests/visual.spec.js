@@ -29,6 +29,7 @@ async function stabilizeRuntime(page) {
 }
 
 async function blurActiveElement(page) {
+  await page.mouse.move(0, 0);
   await page.evaluate(() => {
     if (document.activeElement && typeof document.activeElement.blur === 'function') {
       document.activeElement.blur();

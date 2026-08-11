@@ -1,6 +1,7 @@
 node_modules
 .lighthouseci
 test-results
+.playwright-mcp
 *.log
 .DS_Store
 Thumbs.db

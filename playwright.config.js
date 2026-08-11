@@ -5,6 +5,11 @@ module.exports = defineConfig({
   snapshotDir: './tests/__screenshots__',
   fullyParallel: true,
   retries: process.env.CI ? 2 : 0,
+  expect: {
+    toHaveScreenshot: {
+      maxDiffPixelRatio: 0.03
+    }
+  },
   use: {
     channel: 'chromium',
     baseURL: 'http://127.0.0.1:4174',

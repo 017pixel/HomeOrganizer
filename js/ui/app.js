@@ -135,6 +135,12 @@ async function renderTasks(){
   if(!c) return;
   c.innerHTML='';
   const tasks=await HomeDB.tasks.list();
+  if(tasks.length===0){
+    const empty=el('div','list-empty');
+    empty.textContent='Noch keine Aufgaben. Füge deine erste hinzu.';
+    c.append(empty);
+    return;
+  }
   tasks.forEach(t=>c.append(renderTaskItem(t)));
 
   if (!listSwipeManager) {
@@ -237,10 +243,7 @@ function initTabs(){
     }
     try {
       if (tab==='plan') await renderPlan();
-      if (tab==='tasks') {
-        await renderTasks();
-        showUpdatePopupIfNeeded();
-      }
+      if (tab==='tasks') await renderTasks();
       if (tab==='week') await renderWeekOverview(0);
       if (tab==='stats') await renderStats();
     } catch (err) {
@@ -273,25 +276,6 @@ function initActions(){
   var weekGrid=$('#week-grid');
   if(weekGrid)initWeekSwipe(weekGrid);
 
-  const shuffleBtn=$('#shuffle');
-  if (shuffleBtn) shuffleBtn.onclick=async()=>{
-    if (!cardStackManager) await renderPlan();
-    const current = cardStackManager ? cardStackManager.getCurrentTask() : null;
-    if (!current || current.id < 0) return;
-    try {
-      const updated = await HomeScheduler.swapTask(todayKey(), current.id);
-      await cardStackManager.loadCards(updated.tasks, { swapsRemaining: updated.swapsRemaining });
-    } catch (e) {
-      if (cardStackManager) cardStackManager.showToast(e && e.message ? e.message : 'Keine Swaps mehr verfügbar');
-    }
-  };
-  const completeBtn=$('#complete');
-  if (completeBtn) completeBtn.onclick=async()=>{
-    await HomeScheduler.completePlan(todayKey());
-    await renderPlan();
-    await renderStats();
-    if (cardStackManager) cardStackManager.showToast('Abgeschlossen!');
-  };
   $('#add-task').onclick=()=>openTaskModal();
   const toggle=$('#theme-toggle');
   if(toggle){
@@ -476,62 +460,6 @@ function openTutorial(){
 function showTutorialIfNeeded(){
   const seen = localStorage.getItem('onboardingSeen') === '1';
   if(!seen) openTutorial();
-}
-
-let updateIndex = 0;
-function setUpdateSlide(nextIndex){
-  const slides = document.getElementById('update-slides');
-  const dots = document.getElementById('update-dots');
-  const back = document.getElementById('update-back');
-  const next = document.getElementById('update-next');
-  if(!slides || !dots || !back || !next) return;
-  updateIndex = Math.max(0, Math.min(1, nextIndex));
-  slides.style.transform = `translateX(${-updateIndex * 100}%)`;
-  Array.from(dots.querySelectorAll('.tutorial__dot')).forEach((d, i) => d.classList.toggle('active', i === updateIndex));
-  back.disabled = updateIndex === 0;
-  next.textContent = updateIndex === 1 ? 'Fertig' : 'Weiter';
-}
-
-function openUpdateModal(){
-  const b=$('#update-backdrop');
-  const m=$('#update-modal');
-  if(!b||!m) return;
-  const previouslyFocused=document.activeElement;
-  b.classList.add('open');
-  b.setAttribute('aria-hidden','false');
-  m.classList.add('open');
-  m.setAttribute('aria-hidden','false');
-  setUpdateSlide(0);
-  const close=()=>{
-    m.classList.remove('open');
-    m.setAttribute('aria-hidden','true');
-    b.classList.remove('open');
-    b.setAttribute('aria-hidden','true');
-    localStorage.setItem('swipeUpdateSeen', '1');
-    document.removeEventListener('keydown', onKeyDown);
-    if(previouslyFocused && typeof previouslyFocused.focus === 'function') previouslyFocused.focus();
-  };
-  const onKeyDown=(e)=>{
-    if(e.key==='Escape'){e.preventDefault();close();return;}
-  };
-  document.addEventListener('keydown', onKeyDown);
-  b.onclick=(e)=>{if(e.target===b) close();};
-  const closeBtn=$('#update-close');
-  if(closeBtn) closeBtn.onclick=close;
-  const backBtn=$('#update-back');
-  const nextBtn=$('#update-next');
-  if(backBtn) backBtn.onclick=()=>setUpdateSlide(updateIndex-1);
-  if(nextBtn) nextBtn.onclick=()=>{
-    if(updateIndex>=1) close();
-    else setUpdateSlide(updateIndex+1);
-  };
-  const first=m.querySelector('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])');
-  if(first) first.focus();
-}
-
-function showUpdatePopupIfNeeded(){
-  const seen = localStorage.getItem('swipeUpdateSeen') === '1';
-  if(!seen) openUpdateModal();
 }
 
 function downloadJSON(filename, obj){
@@ -1011,7 +939,7 @@ async function renderStats(){
       d.style.flexDirection='column';
       d.style.alignItems='center';
       d.style.gap='4px';
-      const v=el('div','');v.style.fontSize='var(--text-xxl,32px)';v.style.fontWeight='var(--font-black)';v.style.fontFamily='var(--font-display)';v.style.color='var(--accent-primary)';v.style.lineHeight='1.1';v.textContent=row.value;
+      const v=el('div','');v.style.fontSize='var(--text-2xl)';v.style.fontWeight='var(--font-black)';v.style.fontFamily='var(--font-display)';v.style.color='var(--accent-primary)';v.style.lineHeight='1.1';v.textContent=row.value;
       const l=el('div','');l.style.fontSize='var(--text-sm)';l.style.color='var(--text-secondary)';l.textContent=row.label;
       d.append(v,l);
       body.append(d);
@@ -1095,17 +1023,18 @@ async function getOrGeneratePlansForDates(dateKeys){
   for(var i=0;i<entries.length;i++){
     if(entries[i]&&entries[i].date)map.set(entries[i].date,entries[i]);
   }
+  var ensured=false;
   for(var i=0;i<dateKeys.length;i++){
     var dateKey=dateKeys[i];
-    if(!map.has(dateKey)){
-      try{
-        if(window.HomeScheduler&&typeof window.HomeScheduler.ensurePlansForDays==='function'){
-          await window.HomeScheduler.ensurePlansForDays(35);
-        }
-        var plan=await HomeDB.dailyPlans.get(dateKey);
-        if(plan)map.set(dateKey,plan);
-      }catch(e){}
-    }
+    if(map.has(dateKey))continue;
+    try{
+      if(!ensured&&window.HomeScheduler&&typeof window.HomeScheduler.ensurePlansForDays==='function'){
+        await window.HomeScheduler.ensurePlansForDays(35);
+        ensured=true;
+      }
+      var plan=await HomeDB.dailyPlans.get(dateKey);
+      if(plan)map.set(dateKey,plan);
+    }catch(e){}
   }
   return map;
 }

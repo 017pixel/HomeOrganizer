@@ -1,4 +1,4 @@
-const CACHE_NAME = 'homeorganizer-v12'; // MUST be bumped on every release to bust old caches
+const CACHE_NAME = 'homeorganizer-v13'; // MUST be bumped on every release to bust old caches
 const PRECACHE = [
   './',
   './index.html',
@@ -10,23 +10,19 @@ const PRECACHE = [
   './assets/icons/pwa/icon-512.png',
   './assets/icons/pwa/icon-1024.png',
   './styles/design-system.css',
+  './assets/fonts/archivo-black.woff2',
+  './assets/fonts/space-grotesk-400.woff2',
+  './assets/fonts/space-grotesk-500.woff2',
+  './assets/fonts/space-grotesk-700.woff2',
   './js/db/idb.js',
   './js/logic/recurrence.js',
+  './js/logic/weekOverview.js',
   './js/logic/plannerCore.js',
   './js/logic/scheduler.js',
+  './js/logic/statsEngine.js',
   './js/ui/cardStack.js',
   './js/ui/listSwipe.js',
-  './js/ui/app.js',
-  './assets/icons/material/calendar_today.svg',
-  './assets/icons/material/checklist.svg',
-  './assets/icons/material/bar_chart.svg',
-  './assets/icons/material/settings.svg',
-  './assets/icons/material/refresh.svg',
-  './assets/icons/material/check_circle.svg',
-  './assets/icons/material/add.svg',
-  './assets/icons/material/delete.svg',
-  './assets/icons/material/dark_mode.svg',
-  './assets/icons/material/light_mode.svg'
+  './js/ui/app.js'
 ];
 self.addEventListener('message', e => {
   if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();

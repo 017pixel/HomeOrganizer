@@ -1,5 +1,32 @@
 # Changelog
 
+## [2.0.0] - 2026-08-11
+
+### Erstellt
+- CI-Workflow mit Unit- und Visual-Tests für jede Änderung
+- Fonts lokal eingebunden, App funktioniert komplett offline ohne externe Dienste
+- Tabs mit sichtbaren Beschriftungen, leere Aufgabenliste mit Hinweis
+- Neue Unit-Tests für Planer, Fair-Rotation und Wiederholungen
+
+### Verändert
+- Dependencies auf aktuelle Versionen aktualisiert (Vitest 4, Playwright 1.62)
+- Kontrast von Text auf Akzentflächen verbessert
+- Wochenansicht lädt fehlende Pläne jetzt effizient statt 35 Tage mehrfach zu generieren
+- Visuelle Tests laufen plattformunabhängig auf eigenem Test-Port
+
+### Behoben
+- Offline-Modus: fehlende Module der Wochen- und Statistikseite wurden nicht vorab gespeichert
+- Beim Reload der Aufgabenliste konnte die App hängen (Hintergrund-Requests reduziert)
+- Veraltetes Update-Popup zeigte seit mehreren Versionen veraltete Tipps
+
+### Gelöscht
+- node_modules aus der Versionsverwaltung entfernt (14000+ Dateien)
+- Nicht mehr gepflegtes Lighthouse-CI-Tooling entfernt
+- Ungenutzte Icons, Fonts, CSS-Klassen und toter Code entfernt
+- Doppelte Testdateien und alte Screenshots entfernt
+
+---
+
 ## [1.8.4] - 2026-05-10
 
 ### Behoben

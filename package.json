@@ -1,19 +1,16 @@
 {
   "name": "cleanhome-pwa",
-  "version": "1.8.4",
   "private": true,
   "scripts": {
     "dev": "http-server . -p 1233 -c-1",
     "serve": "http-server . -p 4173 -c-1",
     "test:visual": "playwright test",
     "test:visual:update": "playwright test --update-snapshots",
-    "test:unit": "vitest run",
-    "lh": "lhci autorun --config=./lighthouserc.json"
+    "test:unit": "vitest run"
   },
   "devDependencies": {
-    "@lhci/cli": "^0.14.0",
-    "@playwright/test": "^1.50.0",
+    "@playwright/test": "^1.62.1",
     "http-server": "^14.1.1",
-    "vitest": "^2.1.9"
+    "vitest": "^4.1.10"
   }
 }

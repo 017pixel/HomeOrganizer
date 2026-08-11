@@ -42,5 +42,69 @@ describe('HomePlannerCore', () => {
     expect(plan.tasks).toHaveLength(3);
     expect(plan.tasks.some(t => t.fixed)).toBe(false);
   });
+
+  it('bevorzugt weniger genutzte Aufgaben (Fair-Rotation)', () => {
+    const tasks = [
+      { id: 10, title: 'Viel genutzt', duration: 15 },
+      { id: 11, title: 'Wenig genutzt', duration: 15 }
+    ];
+    const plan = PlannerCore.buildPlanTasks({
+      dateKey: '2026-02-10',
+      tasks,
+      minutes: 60,
+      maxTasks: 3,
+      rng: () => 0.99,
+      taskUsageCounts: { 10: 5, 11: 0 }
+    });
+    expect(plan.tasks.map(t => t.id)).toContain(11);
+    const idx10 = plan.tasks.findIndex(t => t.id === 10);
+    const idx11 = plan.tasks.findIndex(t => t.id === 11);
+    expect(idx11).toBeLessThan(idx10);
+  });
+
+  it('schließt ausgeschlossene Aufgaben aus, solange genug andere existieren', () => {
+    const tasks = [
+      { id: 10, title: 'Gestern', duration: 15 },
+      { id: 11, title: 'Frei A', duration: 30 },
+      { id: 12, title: 'Frei B', duration: 30 },
+      { id: 13, title: 'Frei C', duration: 30 }
+    ];
+    const plan = PlannerCore.buildPlanTasks({
+      dateKey: '2026-02-10',
+      tasks,
+      minutes: 60,
+      maxTasks: 3,
+      rng: () => 0.1,
+      excludeTaskIds: new Set([10])
+    });
+    expect(plan.tasks.map(t => t.id)).not.toContain(10);
+    expect(plan.tasks).toHaveLength(3);
+  });
+
+  it('begrenzt tägliche feste Aufgaben auf maximal eine pro Tag', () => {
+    const tasks = [
+      { id: 1, title: 'Täglich 1', duration: 15, repeat: { kind: 'custom', unit: 'day', every: 1, startDate: '2026-02-01' } },
+      { id: 2, title: 'Täglich 2', duration: 15, repeat: { kind: 'custom', unit: 'day', every: 1, startDate: '2026-02-01' } },
+      { id: 3, title: 'Täglich 3', duration: 15, repeat: { kind: 'custom', unit: 'day', every: 1, startDate: '2026-02-01' } },
+      { id: 10, title: 'Frei A', duration: 15 },
+      { id: 11, title: 'Frei B', duration: 30 }
+    ];
+    const plan = PlannerCore.buildPlanTasks({ dateKey: '2026-02-10', tasks, minutes: 60, maxTasks: 3, rng: () => 0.5 });
+    const daily = plan.tasks.filter(t => t.fixed);
+    expect(daily).toHaveLength(1);
+    expect(plan.tasks).toHaveLength(3);
+    expect(plan.tasks.filter(t => !t.fixed)).toHaveLength(2);
+  });
+
+  it('mappt überfällige feste Aufgaben nur an ihrem Fälligkeitstag', () => {
+    const tasks = [
+      { id: 1, title: 'Überfällig (Montag)', duration: 30, repeat: { kind: 'weekly', startDate: '2026-02-02', daysOfWeek: [0], intervalWeeks: 1 }, nextDue: '2026-02-03' },
+      { id: 10, title: 'Frei A', duration: 15 },
+      { id: 11, title: 'Frei B', duration: 30 },
+      { id: 12, title: 'Frei C', duration: 30 }
+    ];
+    const plan = PlannerCore.buildPlanTasks({ dateKey: '2026-02-10', tasks, minutes: 60, maxTasks: 3, rng: () => 0.5 });
+    expect(plan.tasks.some(t => t.id === 1 && t.fixed)).toBe(false);
+  });
 });
 

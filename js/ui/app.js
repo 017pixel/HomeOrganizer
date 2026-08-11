@@ -265,7 +265,6 @@ function initTabs(){
   const tabbar=document.querySelector('.tabbar');
   if(tabbar) tabbar.setAttribute('role','tablist');
   window.__setActiveTab = setActiveTab;
-  setActiveTab('plan');
 }
 function initActions(){
   const weekPrev=$('#week-prev');
@@ -1231,6 +1230,8 @@ function initWeekSwipe(gridEl){
 }
 async function start(){
   try {
+    initTabs();
+    initActions();
     await ensureDefaults();
     await ensureDayRollover();
     const currentVersion = window.APP_VERSION;
@@ -1242,8 +1243,7 @@ async function start(){
       await HomeDB.settings.put({ key: 'lastAppVersion', value: currentVersion });
       try { await HomeDB.settings.del('migrated_plan_algo_v2'); } catch (e) { /* noop */ }
     }
-    initTabs();
-    initActions();
+    await window.__setActiveTab('plan');
     await renderTasks();
     await renderStats();
     scheduleMidnightRefresh();
